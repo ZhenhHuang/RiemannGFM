@@ -22,7 +22,7 @@ class EuclideanEncoder(nn.Module):
 
     def forward(self, x):
         x = self.activation(self.lin(x))
-        x = self.proj(F.dropout(x, p=dropout, training=self.training))
+        x = self.proj(F.dropout(x, p=self.drop, training=self.training))
         return x
 
 

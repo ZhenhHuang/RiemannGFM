@@ -8,16 +8,27 @@ from manifolds import Lorentz, Sphere
 
 
 class GeoGFM(nn.Module):
-    def __init__(self, in_dim, out_dim, bias, activation, dropout):
+    def __init__(self, n_layers, in_dim, out_dim, bias, activation, dropout):
         super(GeoGFM, self).__init__()
         self.manifold_H = Lorentz()
         self.manifold_S = Sphere()
         self.init_block = InitBlock(self.manifold_H, self.manifold_S, in_dim, out_dim, bias, activation, dropout)
+        self.blocks = nn.ModuleList([])
+        for i in range(n_layers):
+            self.blocks.append(StructuralBlock(self.manifold_H, self.manifold_S, out_dim + 1))
 
+    def forward(self, x, data_dict):
+        """
 
-
-    def forward(self, x):
+        :param x: raw features
+        :param data_dict: dictionary of data_list indexed k-hop
+        :return: z: node product representations
+        """
         x_E, x_H, x_S = self.init_block(x)
+        for i, block in enumerate(self.blocks):
+            data_list = data_dict[i + 1]
+            x_H, x_S = block((x_H, x_S), data_list)
+        return x_E, x_H, x_S
 
 
 class InitBlock(nn.Module):
@@ -40,8 +51,34 @@ class InitBlock(nn.Module):
 
 
 class StructuralBlock(nn.Module):
-    def __init__(self):
+    def __init__(self, manifold_H, manifold_S, in_dim):
         super(StructuralBlock, self).__init__()
+        self.manifold_H = manifold_H
+        self.manifold_S = manifold_S
+        self.Hyp_learner = HyperbolicStructureLearner(self.manifold_H, in_dim=in_dim)
+        self.Sph_learner = SphericalStructureLearner(self.manifold_S, in_dim=in_dim)
 
-    def forward(self, x_tuple):
-        pass
+    def forward(self, x_tuple, data_list):
+        """
+
+        :param x_tuple: (x_H, x_S)
+        :param data_list:
+        :return: x_tuple: (x_H, x_S)
+        """
+        x_H, x_S = x_tuple
+        x_H = self.Hyp_learner(x_H, data_list)
+        x_S = self.Sph_learner(x_S, data_list)
+        return x_H, x_S
+
+
+if __name__ == '__main__':
+    from data.graph_exacters import graph_exacter
+    from torch_geometric.datasets import KarateClub
+    dataset = KarateClub()
+    data = dataset.get(0)
+    data_dict = {}
+    for i in range(2):
+        data_dict[i + 1] = graph_exacter(data, k_hop=i + 1)
+    model = GeoGFM(2, 34, 5, True, F.relu, 0.)
+    y = model(data.x, data_dict)
+    #TODO: Activation interface
