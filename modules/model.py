@@ -35,8 +35,8 @@ class InitBlock(nn.Module):
     def __init__(self, manifold_H, manifold_S, in_dim, out_dim, bias, activation, dropout):
         super(InitBlock, self).__init__()
         self.Euc_init = EuclideanEncoder(in_dim, out_dim, bias, activation, dropout)
-        self.Hyp_init = ManifoldEncoder(manifold_H, in_dim, out_dim, bias, activation, dropout)
-        self.Sph_init = ManifoldEncoder(manifold_S, in_dim, out_dim, bias, activation, dropout)
+        self.Hyp_init = ManifoldEncoder(manifold_H, in_dim, out_dim, bias, None, 0.)
+        self.Sph_init = ManifoldEncoder(manifold_S, in_dim, out_dim, bias, None, 0.)
 
     def forward(self, x):
         """
@@ -71,14 +71,13 @@ class StructuralBlock(nn.Module):
         return x_H, x_S
 
 
-if __name__ == '__main__':
-    from data.graph_exacters import graph_exacter
-    from torch_geometric.datasets import KarateClub
-    dataset = KarateClub()
-    data = dataset.get(0)
-    data_dict = {}
-    for i in range(2):
-        data_dict[i + 1] = graph_exacter(data, k_hop=i + 1)
-    model = GeoGFM(2, 34, 5, True, F.relu, 0.)
-    y = model(data.x, data_dict)
-    #TODO: Activation interface
+# if __name__ == '__main__':
+#     from data.graph_exacters import graph_exacter
+#     from torch_geometric.datasets import KarateClub
+#     dataset = KarateClub()
+#     data = dataset.get(0)
+#     data_dict = {}
+#     for i in range(2):
+#         data_dict[i + 1] = graph_exacter(data, k_hop=i + 1)
+#     model = GeoGFM(2, 34, 5, True, F.relu, 0.)
+#     y = model(data.x, data_dict)

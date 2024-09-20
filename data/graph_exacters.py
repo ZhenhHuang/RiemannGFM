@@ -12,10 +12,11 @@ def graph_exacter(data, k_hop):
     sub_graphs = []
     num_nodes, edge_index = data.x.shape[0], data.edge_index
     for node in range(num_nodes):
-        subset, sub_edge_index, mapping, edge_mask = k_hop_subgraph(node, k_hop, edge_index, num_nodes=num_nodes, relabel_nodes=True)
+        subset, sub_edge_index, mapping, edge_mask = k_hop_subgraph(node, k_hop, edge_index,
+                                                                    num_nodes=num_nodes, relabel_nodes=True)
         tree_dict, k_hop_tree = hierarchical_exacter(subset, sub_edge_index, mapping)
-        sub_graphs.append(Data(edge_index=sub_edge_index, num_nodes=len(subset), subset=subset, central_node=node,
-                               tree_dict=tree_dict))
+        sub_graphs.append(Data(edge_index=sub_edge_index, num_nodes=len(subset),
+                               subset=subset, central_node=node, tree_dict=tree_dict))
     return sub_graphs
 
 
@@ -46,7 +47,6 @@ def hierarchical_exacter(subset, edge_index, mapping, flow: str = 'source_to_tar
         h = h_que.get()
         idx = torch.where(node == row)[0]
         source = col[idx]
-
         for ch in source:
             if visited[ch].item() is False:
                 if flow == 'target_to_source':
@@ -64,11 +64,11 @@ def hierarchical_exacter(subset, edge_index, mapping, flow: str = 'source_to_tar
     return align_dict, tree_edges
 
 
-if __name__ == '__main__':
-    from torch_geometric.utils import to_undirected
-    edge_index = torch.tensor([[0, 1, 2, 3, 4, 5],
-                               [2, 2, 4, 4, 6, 6]])
-    edge_index = to_undirected(edge_index)
-    subset, edge_index, mapping, edge_mask = k_hop_subgraph(
-    6, 2, edge_index, relabel_nodes=True)
-    t_dict, tree = hierarchical_exacter(subset, edge_index, mapping)
+# if __name__ == '__main__':
+#     from torch_geometric.utils import to_undirected
+#     edge_index = torch.tensor([[0, 1, 2, 3, 4, 5],
+#                                [2, 2, 4, 4, 6, 6]])
+#     edge_index = to_undirected(edge_index)
+#     subset, edge_index, mapping, edge_mask = k_hop_subgraph(
+#     6, 2, edge_index, relabel_nodes=True)
+#     t_dict, tree = hierarchical_exacter(subset, edge_index, mapping)

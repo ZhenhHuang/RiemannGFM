@@ -93,20 +93,20 @@ class ManifoldAttention(nn.Module):
         return out
 
 
-if __name__ == '__main__':
-    from data.graph_exacters import graph_exacter
-    from torch_geometric.datasets import KarateClub
-    from layers import ManifoldEncoder
-    dataset = KarateClub()
-    # manifold = Sphere()
-    manifold = Lorentz()
-    data_list = graph_exacter(dataset.get(0), k_hop=2)
-    encoder = ManifoldEncoder(manifold, 34, 5)
-    x = encoder(dataset.get(0).x)
-    # learner = SphericalStructureLearner(manifold, 6)
-    learner = HyperbolicStructureLearner(manifold, 6)
-    y = learner(x, data_list)
-    print(manifold.check_point_on_manifold(y))
+# if __name__ == '__main__':
+#     from data.graph_exacters import graph_exacter
+#     from torch_geometric.datasets import KarateClub
+#     from layers import ManifoldEncoder
+#     dataset = KarateClub()
+#     # manifold = Sphere()
+#     manifold = Lorentz()
+#     data_list = graph_exacter(dataset.get(0), k_hop=2)
+#     encoder = ManifoldEncoder(manifold, 34, 5)
+#     x = encoder(dataset.get(0).x)
+#     # learner = SphericalStructureLearner(manifold, 6)
+#     learner = HyperbolicStructureLearner(manifold, 6)
+#     y = learner(x, data_list)
+#     print(manifold.check_point_on_manifold(y))
 
 
 
