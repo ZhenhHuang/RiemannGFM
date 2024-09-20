@@ -58,7 +58,8 @@ def hierarchical_exacter(subset, edge_index, mapping, flow: str = 'source_to_tar
                 que.put(ch)
                 h_que.put(h + 1)
                 visited[ch] = True
-    tree_edges = torch.sort(torch.stack(tree_edges, dim=1), dim=-1)[0]
+    if len(tree_edges):
+        tree_edges = torch.sort(torch.stack(tree_edges, dim=1), dim=-1)[0]
     for k, v in align_dict.items():
         align_dict[k] = torch.sort(torch.stack(v, dim=1), dim=-1)[0]
     return align_dict, tree_edges
