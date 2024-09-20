@@ -15,7 +15,7 @@ class GeoGFM(nn.Module):
         self.init_block = InitBlock(self.manifold_H, self.manifold_S, in_dim, out_dim, bias, activation, dropout)
         self.blocks = nn.ModuleList([])
         for i in range(n_layers):
-            self.blocks.append(StructuralBlock(self.manifold_H, self.manifold_S, out_dim + 1))
+            self.blocks.append(StructuralBlock(self.manifold_H, self.manifold_S, out_dim))
 
     def forward(self, x, data_dict):
         """

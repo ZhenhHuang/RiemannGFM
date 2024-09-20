@@ -30,8 +30,8 @@ class ManifoldEncoder(nn.Module):
     def __init__(self, manifold, in_dim, out_dim, bias=True, activation=None, dropout=0.1):
         super().__init__()
         self.manifold = manifold
-        self.lin = ConstCurveLinear(manifold, in_dim + 1, out_dim + 1, bias=bias, dropout=dropout, activation=activation)
-        self.proj = ConstCurveLinear(manifold, out_dim + 1, out_dim + 1, bias=bias, dropout=dropout, activation=activation)
+        self.lin = ConstCurveLinear(manifold, in_dim + 1, out_dim, bias=bias, dropout=dropout, activation=activation)
+        self.proj = ConstCurveLinear(manifold, out_dim, out_dim, bias=bias, dropout=dropout, activation=activation)
 
     def forward(self, x):
         o = torch.zeros_like(x).to(x.device)
