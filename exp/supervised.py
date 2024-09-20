@@ -17,7 +17,7 @@ class SupervisedExp:
             pretrained_model = GeoGFM(n_layers=self.configs.n_layers, in_dim=self.configs.in_dim,
                                       out_dim=self.configs.out_dim, bias=self.configs.bias,
                                       dropout=self.configs.dropout, activation=act_fn(self.configs.activation))
-            self.pretrained_model = pretrained_model.load_state_dict(torch.load(self.configs.pretrained_model))
+            self.pretrained_model = pretrained_model.load_state_dict(torch.load(self.configs.pretrained_model_path))
         for module in self.pretrained_model.modules():
             if not isinstance(module, [EuclideanEncoder, ManifoldEncoder]):
                 for param in module.parameters():
