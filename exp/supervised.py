@@ -7,38 +7,35 @@ from modules import *
 from utils.train_utils import EarlyStopping, act_fn
 from utils.evall_utils import cal_accuracy, cal_AUC_AP
 from utils.logger import create_logger
+from data import NodeClsDataset, load_data
+from torch_geometric.loader import DataLoader
 
 
 class SupervisedExp:
     def __init__(self, configs, pretrained_model=None):
         self.configs = configs
-        self.pretrained_model = pretrained_model
-        if self.pretrained_model is None:
-            pretrained_model = GeoGFM(n_layers=self.configs.n_layers, in_dim=self.configs.in_dim,
-                                      out_dim=self.configs.out_dim, bias=self.configs.bias,
-                                      dropout=self.configs.dropout, activation=act_fn(self.configs.activation))
-            self.pretrained_model = pretrained_model.load_state_dict(torch.load(self.configs.pretrained_model_path))
-        for module in self.pretrained_model.modules():
-            if not isinstance(module, [EuclideanEncoder, ManifoldEncoder]):
-                for param in module.parameters():
-                    param.requires_grad = False
+
         if self.configs.use_gpu and torch.cuda.is_available():
             self.device = torch.device('cuda')
         else:
             self.device = torch.device('cpu')
 
-        self.load_data()
+        if pretrained_model is None:
+            pretrained_model = GeoGFM(n_layers=self.configs.n_layers, in_dim=self.configs.in_dim,
+                                      out_dim=self.configs.out_dim, bias=self.configs.bias,
+                                      dropout=self.configs.dropout, activation=act_fn(self.configs.activation))
+            pretrained_model = pretrained_model.load_state_dict(torch.load(self.configs.pretrained_model_path))
+        for module in self.pretrained_model.modules():
+            if not isinstance(module, [EuclideanEncoder, ManifoldEncoder]):
+                for param in module.parameters():
+                    param.requires_grad = False
+        self.pretrained_model = pretrained_model.to(self.device)
 
     def load_model(self):
         pass
 
-    def load_data(self):
-        """
-        According to self.configs.dataset and other args
-        :return:
-        """
-        self.dataset = None
-        self.dataloader = None
+    def load_data(self, split):
+        pass
 
     def train(self):
         pass
@@ -46,7 +43,7 @@ class SupervisedExp:
     def train_step(self, data, optimizer):
         pass
 
-    def val(self):
+    def val(self, val_loader):
         pass
 
     def test(self):
@@ -63,19 +60,30 @@ class NodeClassification(SupervisedExp):
         self.nc_model = self.load_model()
 
     def load_model(self):
-        cls_head = NodeClsHead(self.configs.out_dim, self.dataset.num_classes)
+        cls_head = NodeClsHead(self.configs.out_dim, self.dataset.num_classes).to(self.device)
         nc_model = nn.Sequential(self.pretrained_model, cls_head)
         return nc_model
+
+    def load_data(self, split: str):
+        dataset = NodeClsDataset(raw_dataset=load_data(root=self.configs.root_path,
+                                                       data_name=self.configs.data_name),
+                                 configs=self.configs,
+                                 split=split)
+        dataloader = DataLoader(dataset, batch_size=1)
+        return dataset, dataloader
 
     def train(self):
         logger = create_logger(self.configs.log_path)
         self.nc_model.train()
         optimizer = Adam(self.nc_model.parameters(), lr=self.configs.lr_nc, weight_decay=self.configs.weight_decay_nc)
+        train_set, train_loader = self.load_data("train")
+        val_set, val_loader = self.load_data("val")
         for epoch in range(self.configs.nc_epochs):
             epoch_loss = []
             epoch_acc = []
 
-            for data in self.dataloader:
+            for data in train_loader:
+                data = data.to(self.device)
                 loss, acc = self.train_step(data, optimizer)
                 epoch_loss.append(loss)
                 epoch_acc.append(acc)
@@ -86,24 +94,25 @@ class NodeClassification(SupervisedExp):
             logger.info(f"Epoch {epoch}: train_loss={train_loss}, train_acc={train_acc * 100: .2f}%")
 
             if epoch % self.configs.val_every == 0:
-                val_loss, val_acc = self.val()
+                val_loss, val_acc = self.val(val_loader)
                 logger.info(f"Epoch {epoch}: val_loss={val_loss}, val_acc={val_acc * 100: .2f}%")
 
     def train_step(self, data, optimizer):
         optimizer.zero_grad()
-        out = self.nc_model()
+        out = self.nc_model(data.x, data.data_dict)
         loss, acc = self.cal_loss(out, data.y, data.train_mask)
         loss.backward()
         optimizer.step()
         return loss.item(), acc
 
-    def val(self):
+    def val(self, val_loader):
         self.nc_model.eval()
         val_loss = []
         val_acc = []
         with torch.no_grad():
-            for data in self.dataloader:
-                out = self.nc_model()
+            for data in val_loader:
+                data = data.to(self.device)
+                out = self.nc_model(data.x, data.data_dict)
                 loss, acc = self.cal_loss(out, data.y, data.val_mask)
                 val_loss.append(loss.item())
                 val_acc.append(acc)
@@ -111,11 +120,12 @@ class NodeClassification(SupervisedExp):
         return np.mean(val_loss), np.mean(val_acc)
 
     def test(self):
+        test_set, test_loader = self.load_data("test")
         self.nc_model.eval()
         test_acc = []
         with torch.no_grad():
-            for data in self.dataloader:
-                out = self.nc_model()
+            for data in test_loader:
+                out = self.nc_model(data.x, data.data_dict)
                 loss, acc = self.cal_loss(out, data.y, data.test_mask)
                 test_acc.append(acc)
         return np.mean(test_acc)

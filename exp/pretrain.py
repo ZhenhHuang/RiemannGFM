@@ -7,6 +7,8 @@ from modules import *
 from utils.train_utils import EarlyStopping, act_fn
 from utils.evall_utils import cal_accuracy, cal_AUC_AP
 from utils.logger import create_logger
+from data import load_data, PretrainingNodeDataset
+from torch_geometric.loader import DataLoader
 
 
 class Pretrain:
@@ -19,9 +21,14 @@ class Pretrain:
             self.device = torch.device('cpu')
         self.build_model()
 
-    def load_data(self):
-        dataset = None
-        dataloader = None
+    def load_data(self, task_level):
+        if task_level == 'node':
+            dataset = PretrainingNodeDataset(load_data(root=self.configs.root_path,
+                                                       data_name=self.configs.data_name),
+                                             self.configs)
+            dataloader = DataLoader(dataset, batch_size=1)
+        else:
+            raise NotImplementedError
         return dataset, dataloader
 
     def build_model(self):
@@ -30,7 +37,9 @@ class Pretrain:
                         dropout=self.configs.dropout, activation=act_fn(self.configs.activation))
         self.model = model
 
-    def train(self):
+    def train(self, load=False):
+        if load:
+            self.model.load_state_dict(torch.load(self.configs.pretrained_model_path))
         early_stop = EarlyStopping(self.configs.patience)
         logger = create_logger(self.configs.log_path)
         dataset, dataloader = self.load_data()
@@ -40,7 +49,7 @@ class Pretrain:
             epoch_loss = []
             for data in dataloader:
                 optimizer.zero_grad()
-                output = self.model(data)
+                output = self.model(data.x, data.data_dict)
                 loss = criterion(output)
                 loss.backward()
                 optimizer.step()
