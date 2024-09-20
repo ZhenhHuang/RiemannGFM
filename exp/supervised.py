@@ -5,7 +5,7 @@ from torch.optim import Adam
 import numpy as np
 from modules import *
 from utils.train_utils import EarlyStopping, act_fn
-from utils.evall_utils import cal_accuracy
+from utils.evall_utils import cal_accuracy, cal_AUC_AP
 from utils.logger import create_logger
 
 
@@ -63,7 +63,7 @@ class NodeClassification(SupervisedExp):
         self.nc_model = self.load_model()
 
     def load_model(self):
-        cls_head = nn.Linear(self.configs.out_dim, self.dataset.num_classes)
+        cls_head = NodeClsHead(self.configs.out_dim, self.dataset.num_classes)
         nc_model = nn.Sequential(self.pretrained_model, cls_head)
         return nc_model
 
@@ -198,3 +198,85 @@ class GraphClassification(SupervisedExp):
         loss = F.cross_entropy(output, label)
         acc = cal_accuracy(output, label)
         return loss, acc
+
+
+class LinkPrediction(SupervisedExp):
+    def __init__(self, configs, pretrained_model=None):
+        super(LinkPrediction, self).__init__(configs, pretrained_model)
+        self.lp_model = self.load_model()
+
+    def load_model(self):
+        cls_head = LinkPredHead(self.configs.out_dim, self.configs.out_dim_lp, self.configs.r, self.configs.s)
+        lp_model = nn.Sequential(self.pretrained_model, cls_head)
+        return lp_model
+
+    def train(self):
+        logger = create_logger(self.configs.log_path)
+        self.lp_model.train()
+        optimizer = Adam(self.lp_model.parameters(), lr=self.configs.lr_lp, weight_decay=self.configs.weight_decay_lp)
+        for epoch in range(self.configs.lp_epochs):
+            epoch_loss = []
+            epoch_label = []
+            epoch_pred = []
+
+            for data in self.dataloader:
+                loss, pred, label = self.train_step(data, optimizer)
+                epoch_loss.append(loss)
+                epoch_label += label
+                epoch_pred += pred
+
+            train_loss = np.mean(epoch_loss)
+            train_auc, train_ap = cal_AUC_AP(epoch_pred, epoch_label)
+
+            logger.info(f"Epoch {epoch}: train_loss={train_loss}, train_auc={train_auc * 100: .2f}%, "
+                        f"train_ap={train_ap * 100: .2f}%")
+
+            if epoch % self.configs.val_every == 0:
+                val_loss, val_auc, val_ap = self.val()
+                logger.info(f"Epoch {epoch}: val_loss={val_loss}, val_auc={val_auc * 100: .2f}%, "
+                            f"val_ap={val_ap * 100: .2f}%")
+
+    def train_step(self, data, optimizer):
+        optimizer.zero_grad()
+        out_pos, out_neg = self.lp_model(data.pos_edge_index, data.neg_edge_index)
+        loss, pred, label = self.cal_loss(out_pos, out_neg)
+        loss.backward()
+        optimizer.step()
+        return loss.item(), pred, label
+
+    def val(self):
+        self.lp_model.eval()
+        val_loss = []
+        val_label = []
+        val_pred = []
+        with torch.no_grad():
+            for data in self.dataloader:
+                out_pos, out_neg = self.lp_model(data.pos_edge_index, data.neg_edge_index)
+                loss, pred, label = self.cal_loss(out_pos, out_neg)
+                val_loss.append(loss.item())
+                val_label += label
+                val_pred += pred
+        val_loss = np.mean(val_loss)
+        val_auc, val_ap = cal_AUC_AP(val_pred, val_label)
+        self.lp_model.train()
+        return val_loss, val_auc, val_ap
+
+    def test(self):
+        self.lp_model.eval()
+        test_label = []
+        test_pred = []
+        with torch.no_grad():
+            for data in self.dataloader:
+                out_pos, out_neg = self.lp_model(data.pos_edge_index, data.neg_edge_index)
+                loss, pred, label = self.cal_loss(out_pos, out_neg)
+                test_label += label
+                test_pred += pred
+        test_auc, test_ap = cal_AUC_AP(test_pred, test_label)
+        return test_auc, test_ap
+
+    def cal_loss(self, out_pos, out_neg):
+        loss = F.binary_cross_entropy_with_logits(out_pos, torch.ones_like(out_pos)) + \
+               F.binary_cross_entropy_with_logits(out_neg, torch.zeros_like(out_neg))
+        label = [1] * pos_scores.shape[0] + [0] * neg_scores.shape[0]
+        preds = list(pos_scores.detach().cpu().numpy()) + list(neg_scores.detach().cpu().numpy())
+        return loss, preds, label
