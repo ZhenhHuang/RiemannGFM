@@ -1,6 +1,6 @@
 from torch_geometric.data import Data, Dataset
 from torch_geometric.data.data import BaseData
-from graph_exacters import graph_exacter
+from data.graph_exacters import graph_exacter
 import torch
 
 

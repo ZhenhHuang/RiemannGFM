@@ -1,7 +1,7 @@
 from torch_geometric.data import Data, Dataset
 from torch_geometric.data.data import BaseData
 from torch_geometric.utils import negative_sampling
-from graph_exacters import graph_exacter
+from data.graph_exacters import graph_exacter
 from utils.data_utils import mask_edges
 import torch
 

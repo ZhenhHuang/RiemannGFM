@@ -73,17 +73,17 @@ class SphericalStructureLearner(nn.Module):
         :param batch_data: a batch graph with sub-graphs from one graph.
         :return: New sphere representation of nodes.
         """
-        node_label = batch_data.node_label
+        node_labels = batch_data.node_labels
         batch = batch_data.batch
-        x = x_S[node_label]
-        att_index = torch.cat(torch.where(batch[None] == batch[:, None]), dim=0)
+        x = x_S[node_labels]
+        att_index = torch.stack(torch.where(batch[None] == batch[:, None]), dim=0)
         x = self.attention_subset(x, edge_index=att_index)
 
         x_extend = torch.concat([x, x_S], dim=0)
         label_extend = torch.cat(
-            [node_label, torch.arange(x_S.shape[0], device=x_S.device)],
+            [node_labels, torch.arange(x_S.shape[0], device=x_S.device)],
             dim=0)
-        att_index = torch.cat(
+        att_index = torch.stack(
             torch.where(label_extend[None] == label_extend[:, None]),
             dim=0)
         z_S = self.attention_agg(x_extend, edge_index=att_index)
@@ -112,9 +112,9 @@ class ManifoldAttention(nn.Module):
         else:
             src, dst = edge_index[0], edge_index[1]
             score = self.manifold.inner(None, q[src], k[dst])
-            score = scatter_softmax(score, src)
-            out = scatter_sum(score * v[dst], src)
-            denorm = self.manifold.inner(None, out, keepdim=keepdim)
+            score = scatter_softmax(score, src, dim=-1)
+            out = scatter_sum(score.unsqueeze(1) * v[dst], src, dim=0)
+            denorm = self.manifold.inner(None, out, keepdim=True)
             denorm = denorm.abs().clamp_min(1e-8).sqrt()
             out = 1. / self.manifold.k.sqrt() * out / denorm
         return out
@@ -126,20 +126,33 @@ class ManifoldAttention(nn.Module):
         return out
 
 
-# if __name__ == '__main__':
-#     from data.graph_exacters import graph_exacter
-#     from torch_geometric.datasets import KarateClub
-#     from layers import ManifoldEncoder
-#     dataset = KarateClub()
-#     # manifold = Sphere()
-#     manifold = Lorentz()
-#     data_list = graph_exacter(dataset.get(0), k_hop=2)
-#     encoder = ManifoldEncoder(manifold, 34, 5)
-#     x = encoder(dataset.get(0).x)
-#     # learner = SphericalStructureLearner(manifold, 6)
-#     learner = HyperbolicStructureLearner(manifold, 6)
-#     y = learner(x, data_list)
-#     print(manifold.check_point_on_manifold(y))
+if __name__ == '__main__':
+    from data.graph_exacters import graph_exacter
+    from torch_geometric.datasets import KarateClub
+    from layers import ManifoldEncoder
+    from torch_geometric.utils import k_hop_subgraph
+    from torch_geometric.data import Data, Batch
+    dataset = KarateClub()
+    data = dataset[0]
+    edge_index = data.edge_index
+    node_labels = []
+    data_list = []
+    for node in range(data.num_nodes):
+        subset, sub_edge_index, _, _ = k_hop_subgraph(node, 2, edge_index,
+                                                                num_nodes=data.num_nodes, relabel_nodes=True)
+        node_labels.append(subset)
+        data_list.append(Data(edge_index=sub_edge_index, num_nodes=subset.shape[0], seed_node=node))
+    node_labels = torch.cat(node_labels, dim=0)
+    batch_data = Batch.from_data_list(data_list)
+    batch_data.node_labels = node_labels
 
+    manifold = Sphere()
+    # manifold = Lorentz()
+    # data_list = graph_exacter(dataset.get(0), k_hop=2)
 
-
+    encoder = ManifoldEncoder(manifold, 34, 5)
+    x = encoder(data.x)
+    learner = SphericalStructureLearner(manifold, 5)
+    # learner = HyperbolicStructureLearner(manifold, 5)
+    y = learner(x, batch_data)
+    print(manifold.check_point_on_manifold(y))
