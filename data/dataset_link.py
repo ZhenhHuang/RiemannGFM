@@ -53,16 +53,16 @@ class LinkPredDataset(Dataset):
         return self.data
 
 
-if __name__ == '__main__':
-    from utils.config import DotDict
-    from dataset_vallina import load_data
-    from torch_geometric.loader import DataLoader
-
-    configs = DotDict({"n_layers": 2, "data_name": "KarateClub", "root_path": None})
-    dataset = LinkPredDataset(raw_dataset=load_data(root=configs.root_path,
-                                                   data_name=configs.data_name),
-                             configs=configs,
-                             split="train")
-    loader = DataLoader(dataset, batch_size=1)
-    for data in loader:
-        print(data)
+# if __name__ == '__main__':
+    # from utils.config import DotDict
+    # from dataset_vallina import load_data
+    # from torch_geometric.loader import DataLoader
+    #
+    # configs = DotDict({"n_layers": 2, "data_name": "KarateClub", "root_path": None})
+    # dataset = LinkPredDataset(raw_dataset=load_data(root=configs.root_path,
+    #                                                data_name=configs.data_name),
+    #                          configs=configs,
+    #                          split="train")
+    # loader = DataLoader(dataset, batch_size=1)
+    # for data in loader:
+    #     print(data)
