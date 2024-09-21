@@ -1,4 +1,3 @@
-from torch_geometric.utils import negative_sampling
 import torch
 
 

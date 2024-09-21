@@ -16,21 +16,21 @@ class PretrainingNodeDataset(Dataset):
         self.data = self._extract()
 
     def _extract(self):
-        data = self.raw_dataset.get(0).clone()
+        data = self.raw_dataset[0].clone()
         data.data_dict = {i: graph_exacter(data, i + 1) for i in range(self.configs.n_layers)}
         return data
 
     def len(self) -> int:
-        count = 0
-        for k, v in self.data.data_dict.items():
-            count += len(v)
-        return count
+        return 1
 
     def get(self, idx: int) -> BaseData:
         return self.data
 
 
 class NodeClsDataset(Dataset):
+    """
+    A dataset for node classification that contains only one graph.
+    """
     def __init__(self, raw_dataset: Dataset, configs, split: str = "train"):
         super(NodeClsDataset, self).__init__()
         self.raw_dataset = raw_dataset
@@ -60,10 +60,7 @@ class NodeClsDataset(Dataset):
         return data
 
     def len(self) -> int:
-        count = 0
-        for k, v in self.data.data_dict.items():
-            count += len(v)
-        return count
+        return 1
 
     def get(self, idx: int) -> BaseData:
         return self.data
@@ -72,6 +69,7 @@ class NodeClsDataset(Dataset):
 if __name__ == '__main__':
     from utils.config import DotDict
     from dataset_vallina import load_data
+    from torch_geometric.loader import DataLoader
 
     configs = DotDict({"n_layers": 2, "data_name": "KarateClub", "root_path": None})
     # dataset = NodeClsDataset(raw_dataset=load_data(root=configs.root_path,
@@ -81,3 +79,6 @@ if __name__ == '__main__':
     dataset = PretrainingNodeDataset(raw_dataset=load_data(root=configs.root_path,
                                                    data_name=configs.data_name),
                              configs=configs)
+    loader = DataLoader(dataset, batch_size=1)
+    for data in loader:
+        print(data)
