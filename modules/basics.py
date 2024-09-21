@@ -126,33 +126,33 @@ class ManifoldAttention(nn.Module):
         return out
 
 
-if __name__ == '__main__':
-    from data.graph_exacters import graph_exacter
-    from torch_geometric.datasets import KarateClub
-    from layers import ManifoldEncoder
-    from torch_geometric.utils import k_hop_subgraph
-    from torch_geometric.data import Data, Batch
-    dataset = KarateClub()
-    data = dataset[0]
-    edge_index = data.edge_index
-    node_labels = []
-    data_list = []
-    for node in range(data.num_nodes):
-        subset, sub_edge_index, _, _ = k_hop_subgraph(node, 2, edge_index,
-                                                                num_nodes=data.num_nodes, relabel_nodes=True)
-        node_labels.append(subset)
-        data_list.append(Data(edge_index=sub_edge_index, num_nodes=subset.shape[0], seed_node=node))
-    node_labels = torch.cat(node_labels, dim=0)
-    batch_data = Batch.from_data_list(data_list)
-    batch_data.node_labels = node_labels
-
-    manifold = Sphere()
-    # manifold = Lorentz()
-    # data_list = graph_exacter(dataset.get(0), k_hop=2)
-
-    encoder = ManifoldEncoder(manifold, 34, 5)
-    x = encoder(data.x)
-    learner = SphericalStructureLearner(manifold, 5)
-    # learner = HyperbolicStructureLearner(manifold, 5)
-    y = learner(x, batch_data)
-    print(manifold.check_point_on_manifold(y))
+# if __name__ == '__main__':
+#     from data.graph_exacters import graph_exacter
+#     from torch_geometric.datasets import KarateClub
+#     from layers import ManifoldEncoder
+#     from torch_geometric.utils import k_hop_subgraph
+#     from torch_geometric.data import Data, Batch
+#     dataset = KarateClub()
+#     data = dataset[0]
+#     edge_index = data.edge_index
+#     node_labels = []
+#     data_list = []
+#     for node in range(data.num_nodes):
+#         subset, sub_edge_index, _, _ = k_hop_subgraph(node, 2, edge_index,
+#                                                                 num_nodes=data.num_nodes, relabel_nodes=True)
+#         node_labels.append(subset)
+#         data_list.append(Data(edge_index=sub_edge_index, num_nodes=subset.shape[0], seed_node=node))
+#     node_labels = torch.cat(node_labels, dim=0)
+#     batch_data = Batch.from_data_list(data_list)
+#     batch_data.node_labels = node_labels
+#
+#     manifold = Sphere()
+#     # manifold = Lorentz()
+#     # data_list = graph_exacter(dataset.get(0), k_hop=2)
+#
+#     encoder = ManifoldEncoder(manifold, 34, 5)
+#     x = encoder(data.x)
+#     learner = SphericalStructureLearner(manifold, 5)
+#     # learner = HyperbolicStructureLearner(manifold, 5)
+#     y = learner(x, batch_data)
+#     print(manifold.check_point_on_manifold(y))
