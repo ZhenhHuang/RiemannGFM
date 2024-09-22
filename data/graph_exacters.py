@@ -3,21 +3,31 @@ import numpy as np
 import networkx as nx
 from torch_geometric.utils import k_hop_subgraph
 from torch_geometric.loader import DataLoader
-from torch_geometric.data import Data
+from torch_geometric.data import Data, Batch
 from queue import Queue
 from collections import defaultdict
 
 
-def graph_exacter(data, k_hop):
-    sub_graphs = []
-    num_nodes, edge_index = data.x.shape[0], data.edge_index
-    for node in range(num_nodes):
-        subset, sub_edge_index, mapping, edge_mask = k_hop_subgraph(node, k_hop, edge_index,
-                                                                    num_nodes=num_nodes, relabel_nodes=True)
-        tree_dict, k_hop_tree = hierarchical_exacter(subset, sub_edge_index, mapping)
-        sub_graphs.append(Data(edge_index=sub_edge_index, num_nodes=len(subset),
-                               subset=subset, central_node=node, tree_dict=tree_dict))
-    return sub_graphs
+def graph_exacter(data: Data, k_hop):
+    node_labels = []
+    data_list = []
+    tree_list = []
+    for node in range(data.num_nodes):
+        subset, sub_edge_index, mapping, _ = k_hop_subgraph(node, k_hop, data.edge_index,
+                                                            num_nodes=data.num_nodes, relabel_nodes=True)
+        if sub_edge_index.numel() == 0:
+            continue
+        _, tree_edge_index = hierarchical_exacter(subset, sub_edge_index, mapping, flow='target_to_source')
+        node_labels.append(subset)
+        data_list.append(Data(edge_index=sub_edge_index, num_nodes=subset.shape[0], seed_node=node))
+        tree_list.append(Data(edge_index=tree_edge_index, num_nodes=subset.shape[0], seed_node=node))
+    node_labels = torch.cat(node_labels, dim=0)
+    batch_data = Batch.from_data_list(data_list)
+    batch_tree = Batch.from_data_list(tree_list)
+    batch_tree.node_labels = node_labels
+    data.batch_data = batch_data
+    data.batch_tree = batch_tree
+    return data
 
 
 def hierarchical_exacter(subset, edge_index, mapping, flow: str = 'source_to_target'):

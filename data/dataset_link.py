@@ -43,7 +43,7 @@ class LinkPredDataset(Dataset):
             data.edge_index = self.pos_edge_test
             data.neg_edge_index = self.neg_edge_test
 
-        data.data_dict = {i: graph_exacter(data, i + 1) for i in range(self.configs.n_layers)}
+        data = graph_exacter(data, self.configs.k_hop)
         return data
 
     def len(self) -> int:
@@ -53,16 +53,16 @@ class LinkPredDataset(Dataset):
         return self.data
 
 
-# if __name__ == '__main__':
-    # from utils.config import DotDict
-    # from dataset_vallina import load_data
-    # from torch_geometric.loader import DataLoader
-    #
-    # configs = DotDict({"n_layers": 2, "data_name": "KarateClub", "root_path": None})
-    # dataset = LinkPredDataset(raw_dataset=load_data(root=configs.root_path,
-    #                                                data_name=configs.data_name),
-    #                          configs=configs,
-    #                          split="train")
-    # loader = DataLoader(dataset, batch_size=1)
-    # for data in loader:
-    #     print(data)
+if __name__ == '__main__':
+    from utils.config import DotDict
+    from dataset_vallina import load_data
+    from torch_geometric.loader import DataLoader
+
+    configs = DotDict({"n_layers": 2,
+                      "data_name": "KarateClub",
+                      "root_path": None,
+                      "k_hop": 2})
+    dataset = LinkPredDataset(raw_dataset=load_data(root=configs.root_path,
+                                                   data_name=configs.data_name),
+                             configs=configs,
+                             split="train")

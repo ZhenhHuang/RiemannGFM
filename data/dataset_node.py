@@ -1,6 +1,7 @@
-from torch_geometric.data import Data, Dataset
+from torch_geometric.data import Data, Dataset, Batch
 from torch_geometric.data.data import BaseData
-from data.graph_exacters import graph_exacter
+from torch_geometric.utils import k_hop_subgraph
+from data.graph_exacters import graph_exacter, hierarchical_exacter
 import torch
 
 
@@ -17,7 +18,7 @@ class PretrainingNodeDataset(Dataset):
 
     def _extract(self):
         data = self.raw_dataset[0].clone()
-        data.data_dict = {i: graph_exacter(data, i + 1) for i in range(self.configs.n_layers)}
+        data = graph_exacter(data, self.configs.k_hop)
         return data
 
     def len(self) -> int:
@@ -56,7 +57,7 @@ class NodeClsDataset(Dataset):
         node_idx[mask] = torch.arange(mask.sum(), device=row.device)
         data.edge_index = node_idx[edge_index]
 
-        data.data_dict = {i: graph_exacter(data, i + 1) for i in range(self.configs.n_layers)}
+        data = graph_exacter(data, self.configs.k_hop)
         return data
 
     def len(self) -> int:
@@ -66,19 +67,19 @@ class NodeClsDataset(Dataset):
         return self.data
 
 
-if __name__ == '__main__':
-    from utils.config import DotDict
-    from dataset_vallina import load_data
-    from torch_geometric.loader import DataLoader
-
-    configs = DotDict({"n_layers": 2, "data_name": "KarateClub", "root_path": None})
-    # dataset = NodeClsDataset(raw_dataset=load_data(root=configs.root_path,
-    #                                                data_name=configs.data_name),
-    #                          configs=configs,
-    #                          split="train")
-    dataset = PretrainingNodeDataset(raw_dataset=load_data(root=configs.root_path,
-                                                   data_name=configs.data_name),
-                             configs=configs)
-    loader = DataLoader(dataset, batch_size=1)
-    for data in loader:
-        print(data)
+# if __name__ == '__main__':
+#     from utils.config import DotDict
+#     from dataset_vallina import load_data
+#     from torch_geometric.loader import DataLoader
+#
+#     configs = DotDict({"n_layers": 2,
+#                        "data_name": "KarateClub",
+#                        "root_path": None,
+#                        "k_hop": 2})
+#     # dataset = NodeClsDataset(raw_dataset=load_data(root=configs.root_path,
+#     #                                                data_name=configs.data_name),
+#     #                          configs=configs,
+#     #                          split="train")
+#     dataset = PretrainingNodeDataset(raw_dataset=load_data(root=configs.root_path,
+#                                                    data_name=configs.data_name),
+#                              configs=configs)
