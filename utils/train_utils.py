@@ -1,6 +1,7 @@
 import os.path
 import numpy as np
 import torch
+import torch.nn as nn
 import torch.nn.functional as F
 
 
@@ -13,6 +14,8 @@ def act_fn(act_str: str):
         return F.tanh
     elif act_str == 'elu':
         return F.elu
+    elif str is None:
+        return lambda x: nn.Identity(x)
     else:
         raise NotImplementedError
 

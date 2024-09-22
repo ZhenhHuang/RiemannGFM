@@ -30,11 +30,9 @@ class GraphClsHead(nn.modules):
 
 
 class LinkPredHead(nn.modules):
-    def __init__(self, in_dim, out_dim, r, s):
+    def __init__(self, in_dim, out_dim):
         super(LinkPredHead, self).__init__()
         self.head = nn.Linear(in_dim, out_dim)
-        self.r = r
-        self.s = s
 
     def forward(self, x_tuple, pos_edge_index, neg_edge_index):
         x = self.head(torch.cat(x_tuple, dim=-1))

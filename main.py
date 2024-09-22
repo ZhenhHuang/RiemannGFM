@@ -6,7 +6,6 @@ import argparse
 from exp import Exp
 from utils.logger import create_logger
 
-
 seed = 3047
 random.seed(seed)
 torch.manual_seed(seed)
@@ -14,6 +13,60 @@ np.random.seed(seed)
 
 parser = argparse.ArgumentParser(description='Geometric Graph Foundation Model')
 
+"""Dataset settings"""
+parser.add_argument('--task', type=str, default='NC',
+                    choices=['NC', 'LP'])
+parser.add_argument('--dataset', type=str, default='Physics',
+                    choices=['computers', 'photo', 'KarateClub', 'CS', 'Physics'])
+parser.add_argument('--root_path', type=str, default='./datasets')
+parser.add_argument('--k_hop', type=int, default=2, help='Number of hops of sub-graph')
 
+"""Checkpoints and logger"""
+parser.add_argument('--checkpoints', type=str, default='./checkpoints/')
+parser.add_argument('--pretrained_model_path', type=str)  # necessary
+parser.add_argument('--log_dir', type=str, default='./logs')
+parser.add_argument('--log_name', type=str)  # necessary
+
+"""Model configurations"""
+parser.add_argument('n_layers', type=int, default=2)
+parser.add_argument('--bias', type=bool, default=True)
+parser.add_argument('--dropout', type=float, default=0.1)
+parser.add_argument('--embed_dim', type=int, default=32, help='Embedding dimension of Pretrained model')
+parser.add_argument('--activation', type=str, default=None)
+
+# LP head
+parser.add_argument('--embed_dim_lp', type=int, default=32)
+
+
+"""Training settings"""
+parser.add_argument('--val_every', type=int, default=20)
+parser.add_argument('--patience', type=int, default=10)
+
+# Pretraining
+parser.add_argument('--is_load', type=bool, default=False, help='Whether load model from checkpoints')
+parser.add_argument('--pretrain_level', type=str, default="node", help='pretraining task level')
+parser.add_argument('--pretrain_epochs', type=int, default=200)
+parser.add_argument('--lr', type=float, default=0.001)
+parser.add_argument('--weight_decay', type=float, default=0.0)
+
+# Node classification
+parser.add_argument('--nc_epochs', type=int, default=200)
+parser.add_argument('--lr_nc', type=float, default=0.001)
+parser.add_argument('--weight_decay_nc', type=float, default=0.0)
+
+# Link Prediction
+parser.add_argument('--lp_epochs', type=int, default=200)
+parser.add_argument('--lr_lp', type=float, default=0.001)
+parser.add_argument('--weight_decay_lp', type=float, default=0.0)
+
+# Graph classification
+parser.add_argument('--gc_epochs', type=int, default=200)
+parser.add_argument('--lr_gc', type=float, default=0.001)
+parser.add_argument('--weight_decay_gc', type=float, default=0.0)
+
+"""GPUs"""
+parser.add_argument('--use_gpu', action='store_false', help='use gpu')
+parser.add_argument('--gpu', type=int, default=0, help='gpu')
+parser.add_argument('--devices', type=str, default='0,1', help='device ids of multiple gpus')
 
 configs = parser.parse_args()

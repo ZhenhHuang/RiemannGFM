@@ -73,13 +73,13 @@ class NodeClsDataset(Dataset):
 #     from torch_geometric.loader import DataLoader
 #
 #     configs = DotDict({"n_layers": 2,
-#                        "data_name": "KarateClub",
+#                        "dataset": "KarateClub",
 #                        "root_path": None,
 #                        "k_hop": 2})
 #     # dataset = NodeClsDataset(raw_dataset=load_data(root=configs.root_path,
-#     #                                                data_name=configs.data_name),
+#     #                                                data_name=configs.dataset),
 #     #                          configs=configs,
 #     #                          split="train")
 #     dataset = PretrainingNodeDataset(raw_dataset=load_data(root=configs.root_path,
-#                                                    data_name=configs.data_name),
+#                                                    data_name=configs.dataset),
 #                              configs=configs)

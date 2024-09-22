@@ -7,24 +7,26 @@ from modules import *
 from utils.train_utils import EarlyStopping, act_fn
 from utils.evall_utils import cal_accuracy, cal_AUC_AP
 from utils.logger import create_logger
-from data import NodeClsDataset, LinkPredDataset, load_data
+from data import NodeClsDataset, LinkPredDataset, load_data, input_dim_dict
 from torch_geometric.loader import DataLoader
 
 
 class SupervisedExp:
     def __init__(self, configs, pretrained_model=None):
         self.configs = configs
-
+        self.logger = create_logger(self.configs.log_dir + self.configs.log_name)
         if self.configs.use_gpu and torch.cuda.is_available():
             self.device = torch.device('cuda')
         else:
             self.device = torch.device('cpu')
 
         if pretrained_model is None:
-            pretrained_model = GeoGFM(n_layers=self.configs.n_layers, in_dim=self.configs.in_dim,
-                                      out_dim=self.configs.out_dim, bias=self.configs.bias,
+            pretrained_model = GeoGFM(n_layers=self.configs.n_layers, in_dim=input_dim_dict[self.configs.dataset],
+                                      out_dim=self.configs.embed_dim, bias=self.configs.bias,
                                       dropout=self.configs.dropout, activation=act_fn(self.configs.activation))
-            pretrained_model = pretrained_model.load_state_dict(torch.load(self.configs.pretrained_model_path))
+            pretrained_model = pretrained_model.load_state_dict(
+                torch.load(self.configs.checkpoints + self.configs.pretrained_model_path)
+            )
         for module in self.pretrained_model.modules():
             if not isinstance(module, [EuclideanEncoder, ManifoldEncoder]):
                 for param in module.parameters():
@@ -60,20 +62,19 @@ class NodeClassification(SupervisedExp):
         self.nc_model = self.load_model()
 
     def load_model(self):
-        cls_head = NodeClsHead(self.configs.out_dim, self.dataset.num_classes).to(self.device)
+        cls_head = NodeClsHead(self.configs.embed_dim, self.dataset.num_classes).to(self.device)
         nc_model = nn.Sequential(self.pretrained_model, cls_head)
         return nc_model
 
     def load_data(self, split: str):
         dataset = NodeClsDataset(raw_dataset=load_data(root=self.configs.root_path,
-                                                       data_name=self.configs.data_name),
+                                                       data_name=self.configs.dataset),
                                  configs=self.configs,
                                  split=split)
         dataloader = DataLoader(dataset, batch_size=1)
         return dataset, dataloader
 
     def train(self):
-        logger = create_logger(self.configs.log_path)
         self.nc_model.train()
         optimizer = Adam(self.nc_model.parameters(), lr=self.configs.lr_nc, weight_decay=self.configs.weight_decay_nc)
         train_set, train_loader = self.load_data("train")
@@ -91,15 +92,15 @@ class NodeClassification(SupervisedExp):
             train_loss = np.mean(epoch_loss)
             train_acc = np.mean(epoch_acc)
 
-            logger.info(f"Epoch {epoch}: train_loss={train_loss}, train_acc={train_acc * 100: .2f}%")
+            self.logger.info(f"Epoch {epoch}: train_loss={train_loss}, train_acc={train_acc * 100: .2f}%")
 
             if epoch % self.configs.val_every == 0:
                 val_loss, val_acc = self.val(val_loader)
-                logger.info(f"Epoch {epoch}: val_loss={val_loss}, val_acc={val_acc * 100: .2f}%")
+                self.logger.info(f"Epoch {epoch}: val_loss={val_loss}, val_acc={val_acc * 100: .2f}%")
 
     def train_step(self, data, optimizer):
         optimizer.zero_grad()
-        out = self.nc_model(data.x, data.data_dict)
+        out = self.nc_model(data)
         loss, acc = self.cal_loss(out, data.y, data.train_mask)
         loss.backward()
         optimizer.step()
@@ -112,7 +113,7 @@ class NodeClassification(SupervisedExp):
         with torch.no_grad():
             for data in val_loader:
                 data = data.to(self.device)
-                out = self.nc_model(data.x, data.data_dict)
+                out = self.nc_model(data)
                 loss, acc = self.cal_loss(out, data.y, data.val_mask)
                 val_loss.append(loss.item())
                 val_acc.append(acc)
@@ -125,12 +126,14 @@ class NodeClassification(SupervisedExp):
         test_acc = []
         with torch.no_grad():
             for data in test_loader:
-                out = self.nc_model(data.x, data.data_dict)
+                data = data.to(self.device)
+                out = self.nc_model(data)
                 loss, acc = self.cal_loss(out, data.y, data.test_mask)
                 test_acc.append(acc)
         return np.mean(test_acc)
 
     def cal_loss(self, output, label, mask):
+        # TODO: Inductive loss or transductive loss
         out = output[mask]
         y = label[mask]
         loss = F.cross_entropy(out, y)
@@ -145,19 +148,18 @@ class LinkPrediction(SupervisedExp):
 
     def load_data(self, split):
         dataset = LinkPredDataset(raw_dataset=load_data(root=self.configs.root_path,
-                                                       data_name=self.configs.data_name),
+                                                       data_name=self.configs.dataset),
                                  configs=self.configs,
                                  split=split)
         dataloader = DataLoader(dataset, batch_size=1)
         return dataset, dataloader
 
     def load_model(self):
-        cls_head = LinkPredHead(self.configs.out_dim, self.configs.out_dim_lp, self.configs.r, self.configs.s).to(self.device)
+        cls_head = LinkPredHead(self.configs.embed_dim, self.configs.embed_dim_lp).to(self.device)
         lp_model = nn.Sequential(self.pretrained_model, cls_head)
         return lp_model
 
     def train(self):
-        logger = create_logger(self.configs.log_path)
         self.lp_model.train()
         optimizer = Adam(self.lp_model.parameters(), lr=self.configs.lr_lp, weight_decay=self.configs.weight_decay_lp)
         train_set, train_loader = self.load_data("train")
@@ -168,6 +170,7 @@ class LinkPrediction(SupervisedExp):
             epoch_pred = []
 
             for data in train_loader:
+                data = data.to(self.device)
                 loss, pred, label = self.train_step(data, optimizer)
                 epoch_loss.append(loss)
                 epoch_label += label
@@ -176,17 +179,17 @@ class LinkPrediction(SupervisedExp):
             train_loss = np.mean(epoch_loss)
             train_auc, train_ap = cal_AUC_AP(epoch_pred, epoch_label)
 
-            logger.info(f"Epoch {epoch}: train_loss={train_loss}, train_auc={train_auc * 100: .2f}%, "
+            self.logger.info(f"Epoch {epoch}: train_loss={train_loss}, train_auc={train_auc * 100: .2f}%, "
                         f"train_ap={train_ap * 100: .2f}%")
 
             if epoch % self.configs.val_every == 0:
                 val_loss, val_auc, val_ap = self.val(val_loader)
-                logger.info(f"Epoch {epoch}: val_loss={val_loss}, val_auc={val_auc * 100: .2f}%, "
+                self.logger.info(f"Epoch {epoch}: val_loss={val_loss}, val_auc={val_auc * 100: .2f}%, "
                             f"val_ap={val_ap * 100: .2f}%")
 
     def train_step(self, data, optimizer):
         optimizer.zero_grad()
-        out_pos, out_neg = self.lp_model(data.x, data.data_dict, data.edge_index, data.neg_edge_index)
+        out_pos, out_neg = self.lp_model(data, data.edge_index, data.neg_edge_index)
         loss, pred, label = self.cal_loss(out_pos, out_neg)
         loss.backward()
         optimizer.step()
@@ -199,7 +202,8 @@ class LinkPrediction(SupervisedExp):
         val_pred = []
         with torch.no_grad():
             for data in val_loader:
-                out_pos, out_neg = self.lp_model(data.x, data.data_dict, data.edge_index, data.neg_edge_inde)
+                data = data.to(self.device)
+                out_pos, out_neg = self.lp_model(data, data.edge_index, data.neg_edge_inde)
                 loss, pred, label = self.cal_loss(out_pos, out_neg)
                 val_loss.append(loss.item())
                 val_label += label
@@ -216,7 +220,8 @@ class LinkPrediction(SupervisedExp):
         test_pred = []
         with torch.no_grad():
             for data in test_loader:
-                out_pos, out_neg = self.lp_model(data.x, data.data_dict, data.edge_index, data.neg_edge_inde)
+                data = data.to(self.device)
+                out_pos, out_neg = self.lp_model(data, data.edge_index, data.neg_edge_inde)
                 loss, pred, label = self.cal_loss(out_pos, out_neg)
                 test_label += label
                 test_pred += pred
@@ -241,8 +246,11 @@ class GraphClassification(SupervisedExp):
         gc_model = nn.Sequential(self.pretrained_model, cls_head)
         return gc_model
 
+    def load_data(self, split):
+        # TODO
+        pass
+
     def train(self):
-        logger = create_logger(self.configs.log_path)
         self.gc_model.train()
         optimizer = Adam(self.gc_model.parameters(), lr=self.configs.lr_gc, weight_decay=self.configs.weight_decay_gc)
         for epoch in range(self.configs.gc_epochs):
@@ -257,11 +265,11 @@ class GraphClassification(SupervisedExp):
             train_acc = epoch_correct / len(self.dataloader.dataset)
             train_loss = np.mean(epoch_loss)
 
-            logger.info(f"Epoch {epoch}: train_loss={train_loss}, train_acc={train_acc * 100: .2f}%")
+            self.logger.info(f"Epoch {epoch}: train_loss={train_loss}, train_acc={train_acc * 100: .2f}%")
 
             if epoch % self.configs.val_every == 0:
                 val_loss, val_acc = self.val()
-                logger.info(f"Epoch {epoch}: val_loss={val_loss}, val_acc={val_acc * 100: .2f}%")
+                self.logger.info(f"Epoch {epoch}: val_loss={val_loss}, val_acc={val_acc * 100: .2f}%")
 
     def train_step(self, data, optimizer):
         optimizer.zero_grad()

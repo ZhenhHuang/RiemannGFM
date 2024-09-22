@@ -17,13 +17,13 @@ class GeoGFM(nn.Module):
         for i in range(n_layers):
             self.blocks.append(StructuralBlock(self.manifold_H, self.manifold_S, out_dim))
 
-    def forward(self, x, data):
+    def forward(self, data):
         """
 
-        :param x: raw features
-        :param data: Dataset for a graph contains batched sub-graphs and sub-trees
+        :param data: Dataset for a graph contains batched sub-graphs and sub-trees.
         :return: z: node product representations
         """
+        x = data.x.clone()
         x_E, x_H, x_S = self.init_block(x)
         for i, block in enumerate(self.blocks):
             x_H, x_S = block((x_H, x_S), data)
