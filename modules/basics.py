@@ -12,29 +12,53 @@ class HyperbolicStructureLearner(nn.Module):
         super(HyperbolicStructureLearner, self).__init__()
         assert isinstance(manifold, Lorentz), "The manifold must be a Hyperboloid!"
         self.manifold = manifold
-        self.tree_agg = ConstCurveAgg(manifold, in_dim)
+        # self.tree_agg = ConstCurveAgg(manifold, in_dim)
+        self.tree_agg = ManifoldAttention(manifold, in_dim)
         self.attention_agg = ManifoldAttention(manifold, in_dim)
 
-    def forward(self, x_H, data_list):
-        z_dict = {i: [x_H[i]] for i in range(len(data_list))}
-        for data in data_list:
-            subset, tree_dict = data.subset, data.tree_dict
-            x_H_sub = x_H[subset].clone()
-            k_hop = max(list(tree_dict.keys()))
-            for k in range(k_hop, 0, -1):
-                sub_edges = tree_dict[k]
-                dst = sub_edges[1]
-                x_out = self.tree_agg(x_H_sub, sub_edges)
-                idx = torch.unique(dst, sorted=True)
-                for n in idx:
-                    z_dict[subset[n].item()].append(x_out[n])
-                x_H_sub[idx] = x_out[idx]
-        results = []
-        for k, v_l in z_dict.items():
-            zs = torch.stack(v_l, dim=0)
-            results.append(self.attention_agg(zs.narrow(0, 0, 1), zs, zs))
-        z_S = torch.stack(results, dim=0)
-        return z_S
+    # def forward(self, x_H, data_list):
+    #     z_dict = {i: [x_H[i]] for i in range(len(data_list))}
+    #     for data in data_list:
+    #         subset, tree_dict = data.subset, data.tree_dict
+    #         x_H_sub = x_H[subset].clone()
+    #         k_hop = max(list(tree_dict.keys()))
+    #         for k in range(k_hop, 0, -1):
+    #             sub_edges = tree_dict[k]
+    #             dst = sub_edges[1]
+    #             x_out = self.tree_agg(x_H_sub, sub_edges)
+    #             idx = torch.unique(dst, sorted=True)
+    #             for n in idx:
+    #                 z_dict[subset[n].item()].append(x_out[n])
+    #             x_H_sub[idx] = x_out[idx]
+    #     results = []
+    #     for k, v_l in z_dict.items():
+    #         zs = torch.stack(v_l, dim=0)
+    #         results.append(self.attention_agg(zs.narrow(0, 0, 1), zs, zs))
+    #     z_S = torch.stack(results, dim=0)
+    #     return z_S
+
+    def forward(self, x_H, batch_tree):
+        """
+        Local Attention based on BFS tree structure inherit from a sub-graph.
+        :param x_H: Hyperbolic representation of nodes
+        :param batch_tree: a batch graph with tree-graphs from one graph.
+        :return: New Hyperbolic representation of nodes.
+        """
+        node_labels = batch_tree.node_labels
+        x = x_H[node_labels]
+        att_index = batch_tree.edge_index
+        x = self.tree_agg(x, edge_index=att_index)
+
+        x_extend = torch.concat([x, x_H], dim=0)
+        label_extend = torch.cat(
+            [node_labels, torch.arange(x_H.shape[0], device=x_H.device)],
+            dim=0)
+        att_index = torch.stack(
+            torch.where(label_extend[None] == label_extend[:, None]),
+            dim=0)
+        agg_index = label_extend[att_index]
+        z_H = self.attention_agg(x_extend, edge_index=att_index, agg_index=agg_index[0])
+        return z_H
 
 
 class SphericalStructureLearner(nn.Module):
@@ -86,7 +110,8 @@ class SphericalStructureLearner(nn.Module):
         att_index = torch.stack(
             torch.where(label_extend[None] == label_extend[:, None]),
             dim=0)
-        z_S = self.attention_agg(x_extend, edge_index=att_index)
+        agg_index = label_extend[att_index]
+        z_S = self.attention_agg(x_extend, edge_index=att_index, agg_index=agg_index[0])
         return z_S
 
 
@@ -98,7 +123,7 @@ class ManifoldAttention(nn.Module):
         self.k_lin = ConstCurveLinear(manifold, in_dim, in_dim, bias=False)
         self.v_lin = ConstCurveLinear(manifold, in_dim, in_dim, bias=False)
 
-    def forward(self, x_q, x_k=None, x_v=None, edge_index=None):
+    def forward(self, x_q, x_k=None, x_v=None, edge_index=None, agg_index=None):
         if x_k is None:
             x_k = x_q.clone()
         if x_v is None:
@@ -111,9 +136,10 @@ class ManifoldAttention(nn.Module):
             out = self.global_attention(q, k, v)
         else:
             src, dst = edge_index[0], edge_index[1]
+            agg_index = agg_index if agg_index is not None else src
             score = self.manifold.inner(None, q[src], k[dst])
             score = scatter_softmax(score, src, dim=-1)
-            out = scatter_sum(score.unsqueeze(1) * v[dst], src, dim=0)
+            out = scatter_sum(score.unsqueeze(1) * v[dst], agg_index, dim=0)
             denorm = self.manifold.inner(None, out, keepdim=True)
             denorm = denorm.abs().clamp_min(1e-8).sqrt()
             out = 1. / self.manifold.k.sqrt() * out / denorm
@@ -127,7 +153,7 @@ class ManifoldAttention(nn.Module):
 
 
 # if __name__ == '__main__':
-#     from data.graph_exacters import graph_exacter
+#     from data.graph_exacters import graph_exacter, hierarchical_exacter
 #     from torch_geometric.datasets import KarateClub
 #     from layers import ManifoldEncoder
 #     from torch_geometric.utils import k_hop_subgraph
@@ -137,22 +163,29 @@ class ManifoldAttention(nn.Module):
 #     edge_index = data.edge_index
 #     node_labels = []
 #     data_list = []
+#     tree_list = []
 #     for node in range(data.num_nodes):
-#         subset, sub_edge_index, _, _ = k_hop_subgraph(node, 2, edge_index,
+#         subset, sub_edge_index, mapping, _ = k_hop_subgraph(node, 2, edge_index,
 #                                                                 num_nodes=data.num_nodes, relabel_nodes=True)
+#         _, tree_edge_index = hierarchical_exacter(subset, sub_edge_index, mapping, flow='target_to_source')
 #         node_labels.append(subset)
 #         data_list.append(Data(edge_index=sub_edge_index, num_nodes=subset.shape[0], seed_node=node))
+#         tree_list.append(Data(edge_index=tree_edge_index, num_nodes=subset.shape[0], seed_node=node))
 #     node_labels = torch.cat(node_labels, dim=0)
-#     batch_data = Batch.from_data_list(data_list)
-#     batch_data.node_labels = node_labels
 #
-#     manifold = Sphere()
-#     # manifold = Lorentz()
-#     # data_list = graph_exacter(dataset.get(0), k_hop=2)
+#     # batch_data = Batch.from_data_list(data_list)
+#     # batch_data.node_labels = node_labels
+#     # manifold = Sphere()
+#     # learner = SphericalStructureLearner(manifold, 5)
+#
+#     batch_tree = Batch.from_data_list(tree_list)
+#     batch_tree.node_labels = node_labels
+#     manifold = Lorentz()
+#     learner = HyperbolicStructureLearner(manifold, 5)
 #
 #     encoder = ManifoldEncoder(manifold, 34, 5)
 #     x = encoder(data.x)
-#     learner = SphericalStructureLearner(manifold, 5)
-#     # learner = HyperbolicStructureLearner(manifold, 5)
-#     y = learner(x, batch_data)
+#
+#     # y = learner(x, batch_data)
+#     y = learner(x, batch_tree)
 #     print(manifold.check_point_on_manifold(y))

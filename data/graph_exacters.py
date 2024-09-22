@@ -43,25 +43,29 @@ def hierarchical_exacter(subset, edge_index, mapping, flow: str = 'source_to_tar
     h_que.put(1)
     visited[mapping] = True
     while not que.empty():
+        if (visited == True).all():
+            break
         node = que.get()
         h = h_que.get()
         idx = torch.where(node == row)[0]
         source = col[idx]
-        for ch in source:
-            if visited[ch].item() is False:
-                if flow == 'target_to_source':
-                    edges = torch.tensor([node.item(), ch.item()])
-                else:
-                    edges = torch.tensor([ch.item(), node.item()])
-                tree_edges.append(edges)
-                align_dict[h].append(edges)
-                que.put(ch)
-                h_que.put(h + 1)
-                visited[ch] = True
+        idx = torch.where(visited[source] == False)[0]
+        child = source[idx]
+        visited[child] = True
+        if flow == 'target_to_source':
+            edges = torch.cartesian_prod(node, child)
+        else:
+            edges = torch.cartesian_prod(child, node)
+        tree_edges.append(edges)
+        align_dict[h].append(edges)
+        for ch in child:
+            que.put(ch.reshape(-1))
+            h_que.put(h + 1)
+
     if len(tree_edges):
-        tree_edges = torch.sort(torch.stack(tree_edges, dim=1), dim=-1)[0]
+        tree_edges = torch.sort(torch.cat(tree_edges, dim=0).t(), dim=-1)[0]
     for k, v in align_dict.items():
-        align_dict[k] = torch.sort(torch.stack(v, dim=1), dim=-1)[0]
+        align_dict[k] = torch.sort(torch.cat(v, dim=0).t(), dim=-1)[0]
     return align_dict, tree_edges
 
 
