@@ -17,17 +17,16 @@ class GeoGFM(nn.Module):
         for i in range(n_layers):
             self.blocks.append(StructuralBlock(self.manifold_H, self.manifold_S, out_dim))
 
-    def forward(self, x, data_dict):
+    def forward(self, x, data):
         """
 
         :param x: raw features
-        :param data_dict: dictionary of data_list indexed k-hop
+        :param data: Dataset for a graph contains batched sub-graphs and sub-trees
         :return: z: node product representations
         """
         x_E, x_H, x_S = self.init_block(x)
         for i, block in enumerate(self.blocks):
-            data_list = data_dict[i + 1]
-            x_H, x_S = block((x_H, x_S), data_list)
+            x_H, x_S = block((x_H, x_S), data)
         return x_E, x_H, x_S
 
 
@@ -58,16 +57,16 @@ class StructuralBlock(nn.Module):
         self.Hyp_learner = HyperbolicStructureLearner(self.manifold_H, in_dim=in_dim)
         self.Sph_learner = SphericalStructureLearner(self.manifold_S, in_dim=in_dim)
 
-    def forward(self, x_tuple, data_list):
+    def forward(self, x_tuple, data):
         """
 
         :param x_tuple: (x_H, x_S)
-        :param data_list:
+        :param data: Dataset for a graph contains batched sub-graphs and sub-trees
         :return: x_tuple: (x_H, x_S)
         """
         x_H, x_S = x_tuple
-        x_H = self.Hyp_learner(x_H, data_list)
-        x_S = self.Sph_learner(x_S, data_list)
+        x_H = self.Hyp_learner(x_H, data.batch_tree)
+        x_S = self.Sph_learner(x_S, data.batch_data)
         return x_H, x_S
 
 
