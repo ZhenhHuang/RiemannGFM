@@ -8,14 +8,14 @@ from manifolds import Lorentz, Sphere
 
 
 class GeoGFM(nn.Module):
-    def __init__(self, n_layers, in_dim, out_dim, bias, activation, dropout):
+    def __init__(self, n_layers, in_dim, hidden_dim, embed_dim, bias, activation, dropout):
         super(GeoGFM, self).__init__()
         self.manifold_H = Lorentz()
         self.manifold_S = Sphere()
-        self.init_block = InitBlock(self.manifold_H, self.manifold_S, in_dim, out_dim, bias, activation, dropout)
+        self.init_block = InitBlock(self.manifold_H, self.manifold_S, in_dim, hidden_dim, embed_dim, bias, activation, dropout)
         self.blocks = nn.ModuleList([])
         for i in range(n_layers):
-            self.blocks.append(StructuralBlock(self.manifold_H, self.manifold_S, out_dim))
+            self.blocks.append(StructuralBlock(self.manifold_H, self.manifold_S, embed_dim, hidden_dim, embed_dim))
 
     def forward(self, data):
         """
@@ -24,18 +24,18 @@ class GeoGFM(nn.Module):
         :return: z: node product representations
         """
         x = data.x.clone()
-        x_E, x_H, x_S = self.init_block(x)
+        x_E, x_H, x_S = self.init_block(x)  # [N, Hidden]
         for i, block in enumerate(self.blocks):
             x_H, x_S = block((x_H, x_S), data)
         return x_E, x_H, x_S
 
 
 class InitBlock(nn.Module):
-    def __init__(self, manifold_H, manifold_S, in_dim, out_dim, bias, activation, dropout):
+    def __init__(self, manifold_H, manifold_S, in_dim, hidden_dim, out_dim, bias, activation, dropout):
         super(InitBlock, self).__init__()
-        self.Euc_init = EuclideanEncoder(in_dim, out_dim, bias, activation, dropout)
-        self.Hyp_init = ManifoldEncoder(manifold_H, in_dim, out_dim, bias, None, 0.)
-        self.Sph_init = ManifoldEncoder(manifold_S, in_dim, out_dim, bias, None, 0.)
+        self.Euc_init = EuclideanEncoder(in_dim, hidden_dim, out_dim, bias, activation, dropout)
+        self.Hyp_init = ManifoldEncoder(manifold_H, in_dim, hidden_dim, out_dim, bias, None, 0.)
+        self.Sph_init = ManifoldEncoder(manifold_S, in_dim, hidden_dim, out_dim, bias, None, 0.)
 
     def forward(self, x):
         """
@@ -50,12 +50,12 @@ class InitBlock(nn.Module):
 
 
 class StructuralBlock(nn.Module):
-    def __init__(self, manifold_H, manifold_S, in_dim):
+    def __init__(self, manifold_H, manifold_S, in_dim, hidden_dim, out_dim):
         super(StructuralBlock, self).__init__()
         self.manifold_H = manifold_H
         self.manifold_S = manifold_S
-        self.Hyp_learner = HyperbolicStructureLearner(self.manifold_H, in_dim=in_dim)
-        self.Sph_learner = SphericalStructureLearner(self.manifold_S, in_dim=in_dim)
+        self.Hyp_learner = HyperbolicStructureLearner(self.manifold_H, in_dim, hidden_dim, out_dim)
+        self.Sph_learner = SphericalStructureLearner(self.manifold_S, in_dim, hidden_dim, out_dim)
 
     def forward(self, x_tuple, data):
         """

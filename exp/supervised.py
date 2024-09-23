@@ -22,7 +22,8 @@ class SupervisedExp:
 
         if pretrained_model is None:
             pretrained_model = GeoGFM(n_layers=self.configs.n_layers, in_dim=input_dim_dict[self.configs.dataset],
-                                      out_dim=self.configs.embed_dim, bias=self.configs.bias,
+                                      hidden_dim=self.configs.hidden_dim, embed_dim=self.configs.embed_dim,
+                                      bias=self.configs.bias,
                                       dropout=self.configs.dropout, activation=act_fn(self.configs.activation))
             if load:
                 pretrained_model = pretrained_model.load_state_dict(
@@ -36,10 +37,10 @@ class SupervisedExp:
         self.pretrained_model = pretrained_model.to(self.device)
 
     def load_model(self):
-        pass
+        raise NotImplementedError
 
     def load_data(self, split):
-        pass
+        raise NotImplementedError
 
     def train(self):
         pass
@@ -54,7 +55,7 @@ class SupervisedExp:
         pass
 
     def cal_loss(self, **kwargs):
-        pass
+        raise NotImplementedError
 
 
 class NodeClassification(SupervisedExp):
@@ -240,8 +241,8 @@ class LinkPrediction(SupervisedExp):
     def cal_loss(self, out_pos, out_neg):
         loss = F.binary_cross_entropy_with_logits(out_pos, torch.ones_like(out_pos)) + \
                F.binary_cross_entropy_with_logits(out_neg, torch.zeros_like(out_neg))
-        label = [1] * pos_scores.shape[0] + [0] * neg_scores.shape[0]
-        preds = list(pos_scores.detach().cpu().numpy()) + list(neg_scores.detach().cpu().numpy())
+        label = [1] * out_pos.shape[0] + [0] * out_neg.shape[0]
+        preds = list(out_pos.detach().cpu().numpy()) + list(out_neg.detach().cpu().numpy())
         return loss, preds, label
 
 

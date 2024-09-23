@@ -2,19 +2,21 @@ import torch
 import numpy as np
 import networkx as nx
 from torch_geometric.utils import k_hop_subgraph
-from torch_geometric.loader import DataLoader
+from torch_geometric.loader import NeighborLoader
 from torch_geometric.data import Data, Batch
 from queue import Queue
 from collections import defaultdict
 
 
-def graph_exacter(data: Data, k_hop):
+def graph_exacter(data: Data, hops):
     node_labels = []
     data_list = []
     tree_list = []
-    for node in range(data.num_nodes):
-        subset, sub_edge_index, mapping, _ = k_hop_subgraph(node, k_hop, data.edge_index,
-                                                            num_nodes=data.num_nodes, relabel_nodes=True)
+    loader = NeighborLoader(data, num_neighbors=hops, batch_size=1)
+    for node, batch in enumerate(loader):
+        subset, sub_edge_index = batch.n_id, batch.edge_index
+        subset, idx = torch.sort(subset)
+        mapping = torch.where(idx == 0)[0]
         if sub_edge_index.numel() == 0:
             continue
         _, tree_edge_index = hierarchical_exacter(subset, sub_edge_index, mapping, flow='target_to_source')

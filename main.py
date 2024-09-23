@@ -14,12 +14,12 @@ np.random.seed(seed)
 parser = argparse.ArgumentParser(description='Geometric Graph Foundation Model')
 
 """Dataset settings"""
-parser.add_argument('--task', type=str, default='NC',
+parser.add_argument('--task', type=str, default='LP',
                     choices=['NC', 'LP', 'GC'])
-parser.add_argument('--dataset', type=str, default='KarateClub',
-                    choices=['computers', 'photo', 'KarateClub', 'CS', 'Physics'])
+parser.add_argument('--dataset', type=str, default='Cora',
+                    help=['computers', 'photo', 'KarateClub', 'CS', 'Physics'])
 parser.add_argument('--root_path', type=str, default='./datasets')
-parser.add_argument('--k_hop', type=int, default=2, help='Number of hops of sub-graph')
+parser.add_argument('--hops', type=int, nargs='+', default=[5, 2], help='Number of hops of sub-graph')
 
 """Checkpoints and logger"""
 parser.add_argument('--checkpoints', type=str, default='./checkpoints/')
@@ -28,10 +28,11 @@ parser.add_argument('--log_dir', type=str, default='./logs/')
 parser.add_argument('--log_name', type=str)  # necessary
 
 """Model configurations"""
-parser.add_argument('--n_layers', type=int, default=1)
+parser.add_argument('--n_layers', type=int, default=2)
 parser.add_argument('--bias', type=bool, default=True)
 parser.add_argument('--dropout', type=float, default=0.1)
-parser.add_argument('--embed_dim', type=int, default=32, help='Embedding dimension of Pretrained model')
+parser.add_argument('--embed_dim', type=int, default=16, help='Embedding dimension of Pretrained model')
+parser.add_argument('--hidden_dim', type=int, default=128)
 parser.add_argument('--activation', type=str, default=None)
 
 # LP head
@@ -39,7 +40,7 @@ parser.add_argument('--embed_dim_lp', type=int, default=32)
 
 
 """Training settings"""
-parser.add_argument('--val_every', type=int, default=20)
+parser.add_argument('--val_every', type=int, default=10)
 parser.add_argument('--patience', type=int, default=10)
 
 # Pretraining
@@ -50,8 +51,8 @@ parser.add_argument('--lr', type=float, default=0.001)
 parser.add_argument('--weight_decay', type=float, default=0.0)
 
 # Node classification
-parser.add_argument('--nc_epochs', type=int, default=200)
-parser.add_argument('--lr_nc', type=float, default=0.001)
+parser.add_argument('--nc_epochs', type=int, default=120)
+parser.add_argument('--lr_nc', type=float, default=0.0001)
 parser.add_argument('--weight_decay_nc', type=float, default=0.0)
 
 # Link Prediction
@@ -80,6 +81,12 @@ if configs.pretrained_model_path is None:
 if configs.log_name is None:
     configs.log_name = f"{configs.task}_{configs.dataset}.log"
 
-
-exp = NodeClassification(configs)
+if configs.task == 'NC':
+    exp = NodeClassification(configs)
+elif configs.task == 'LP':
+    exp = LinkPrediction(configs)
+else:
+    raise NotImplementedError
 exp.train()
+
+torch.cuda.empty_cache()

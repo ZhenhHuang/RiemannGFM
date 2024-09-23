@@ -43,7 +43,7 @@ class LinkPredDataset(Dataset):
             data.edge_index = self.pos_edge_test
             data.neg_edge_index = self.neg_edge_test
 
-        data = graph_exacter(data, self.configs.k_hop)
+        data = graph_exacter(data, self.configs.hops)
         return data
 
     def len(self) -> int:
@@ -61,7 +61,7 @@ if __name__ == '__main__':
     configs = DotDict({"n_layers": 2,
                       "dataset": "KarateClub",
                       "root_path": None,
-                      "k_hop": 2})
+                      "hops": 2})
     dataset = LinkPredDataset(raw_dataset=load_data(root=configs.root_path,
                                                    data_name=configs.dataset),
                              configs=configs,

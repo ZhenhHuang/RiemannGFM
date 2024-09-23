@@ -1,6 +1,5 @@
 from torch_geometric.data import Data, Dataset, Batch
 from torch_geometric.data.data import BaseData
-from torch_geometric.utils import k_hop_subgraph
 from data.graph_exacters import graph_exacter, hierarchical_exacter
 import torch
 
@@ -18,7 +17,7 @@ class PretrainingNodeDataset(Dataset):
 
     def _extract(self):
         data = self.raw_dataset[0].clone()
-        data = graph_exacter(data, self.configs.k_hop)
+        data = graph_exacter(data, self.configs.hops)
         return data
 
     def len(self) -> int:
@@ -57,7 +56,7 @@ class NodeClsDataset(Dataset):
         node_idx[mask] = torch.arange(mask.sum(), device=row.device)
         data.edge_index = node_idx[edge_index]
 
-        data = graph_exacter(data, self.configs.k_hop)
+        data = graph_exacter(data, self.configs.hops)
         return data
 
     def len(self) -> int:
@@ -65,21 +64,3 @@ class NodeClsDataset(Dataset):
 
     def get(self, idx: int) -> BaseData:
         return self.data
-
-
-# if __name__ == '__main__':
-#     from utils.config import DotDict
-#     from dataset_vallina import load_data
-#     from torch_geometric.loader import DataLoader
-#
-#     configs = DotDict({"n_layers": 2,
-#                        "dataset": "KarateClub",
-#                        "root_path": None,
-#                        "k_hop": 2})
-#     # dataset = NodeClsDataset(raw_dataset=load_data(root=configs.root_path,
-#     #                                                data_name=configs.dataset),
-#     #                          configs=configs,
-#     #                          split="train")
-#     dataset = PretrainingNodeDataset(raw_dataset=load_data(root=configs.root_path,
-#                                                    data_name=configs.dataset),
-#                              configs=configs)

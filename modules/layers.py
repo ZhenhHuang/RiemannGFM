@@ -13,11 +13,11 @@ class EuclideanEncoder(nn.Module):
     Here we use MLP as a basic example and fine-tune it.
     But for other models like Transformer and LLM, we can pretrain it.
     """
-    def __init__(self, in_dim, out_dim, bias=True, activation=F.relu, dropout=0.1):
+    def __init__(self, in_dim, hidden_dim, out_dim, bias=True, activation=F.relu, dropout=0.1):
         super().__init__()
-        self.lin = nn.Linear(in_dim, out_dim, bias=bias)
+        self.lin = nn.Linear(in_dim, hidden_dim, bias=bias)
         self.activation = activation
-        self.proj = nn.Linear(out_dim, out_dim, bias=bias)
+        self.proj = nn.Linear(hidden_dim, out_dim, bias=bias)
         self.drop = dropout
 
     def forward(self, x):
@@ -27,11 +27,11 @@ class EuclideanEncoder(nn.Module):
 
 
 class ManifoldEncoder(nn.Module):
-    def __init__(self, manifold, in_dim, out_dim, bias=True, activation=None, dropout=0.1):
+    def __init__(self, manifold, in_dim, hidden_dim, out_dim, bias=True, activation=None, dropout=0.1):
         super().__init__()
         self.manifold = manifold
-        self.lin = ConstCurveLinear(manifold, in_dim + 1, out_dim, bias=bias, dropout=dropout, activation=activation)
-        self.proj = ConstCurveLinear(manifold, out_dim, out_dim, bias=bias, dropout=dropout, activation=activation)
+        self.lin = ConstCurveLinear(manifold, in_dim + 1, hidden_dim, bias=bias, dropout=dropout, activation=activation)
+        self.proj = ConstCurveLinear(manifold, hidden_dim, out_dim, bias=bias, dropout=dropout, activation=activation)
 
     def forward(self, x):
         o = torch.zeros_like(x).to(x.device)
@@ -71,7 +71,7 @@ class ConstCurveLinear(nn.Module):
         x = self.weight(self.dropout(x))
         x_narrow = x.narrow(-1, 1, x.shape[-1] - 1)
         time = x.narrow(-1, 0, 1).sigmoid() * self.scale.exp() + 1.1 if isinstance(self.manifold, Lorentz)  \
-        else x.narrow(-1, 0, 1)
+        else x.narrow(-1, 0, 1).sigmoid() - 0.5
         scale = self.sign * (1. / self.manifold.k - time * time) / \
             (x_narrow * x_narrow).sum(dim=-1, keepdim=True).clamp_min(1e-8)
         x = torch.cat([time, x_narrow * scale.sqrt()], dim=-1)

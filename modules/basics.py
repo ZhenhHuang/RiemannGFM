@@ -8,34 +8,12 @@ from torch_scatter import scatter_sum, scatter_softmax
 
 
 class HyperbolicStructureLearner(nn.Module):
-    def __init__(self, manifold, in_dim):
+    def __init__(self, manifold, in_dim, hidden_dim, out_dim):
         super(HyperbolicStructureLearner, self).__init__()
         assert isinstance(manifold, Lorentz), "The manifold must be a Hyperboloid!"
         self.manifold = manifold
-        # self.tree_agg = ConstCurveAgg(manifold, in_dim)
-        self.tree_agg = ManifoldAttention(manifold, in_dim)
-        self.attention_agg = ManifoldAttention(manifold, in_dim)
-
-    # def forward(self, x_H, data_list):
-    #     z_dict = {i: [x_H[i]] for i in range(len(data_list))}
-    #     for data in data_list:
-    #         subset, tree_dict = data.subset, data.tree_dict
-    #         x_H_sub = x_H[subset].clone()
-    #         k_hop = max(list(tree_dict.keys()))
-    #         for k in range(k_hop, 0, -1):
-    #             sub_edges = tree_dict[k]
-    #             dst = sub_edges[1]
-    #             x_out = self.tree_agg(x_H_sub, sub_edges)
-    #             idx = torch.unique(dst, sorted=True)
-    #             for n in idx:
-    #                 z_dict[subset[n].item()].append(x_out[n])
-    #             x_H_sub[idx] = x_out[idx]
-    #     results = []
-    #     for k, v_l in z_dict.items():
-    #         zs = torch.stack(v_l, dim=0)
-    #         results.append(self.attention_agg(zs.narrow(0, 0, 1), zs, zs))
-    #     z_S = torch.stack(results, dim=0)
-    #     return z_S
+        self.tree_agg = ManifoldAttention(manifold, in_dim, hidden_dim, out_dim)
+        self.attention_agg = ManifoldAttention(manifold, out_dim, hidden_dim, out_dim)
 
     def forward(self, x_H, batch_tree):
         """
@@ -62,33 +40,12 @@ class HyperbolicStructureLearner(nn.Module):
 
 
 class SphericalStructureLearner(nn.Module):
-    def __init__(self, manifold, in_dim):
+    def __init__(self, manifold, in_dim, hidden_dim, out_dim):
         super(SphericalStructureLearner, self).__init__()
         assert isinstance(manifold, Sphere), "The manifold must be a Sphere!"
         self.manifold = manifold
-        self.attention_subset = ManifoldAttention(manifold, in_dim)
-        self.attention_agg = ManifoldAttention(manifold, in_dim)
-
-    # def forward(self, x_S, data_list):
-    #     """
-    #
-    #     :param x_S: Spherical representation
-    #     :param data_list:
-    #     :return:
-    #     """
-    #     z_dict = {i: [x_S[i]] for i in range(len(data_list))}
-    #     for data in data_list:
-    #         subset, sub_edge_index = data.subset, data.edge_index
-    #         x_S_sub = x_S[subset]
-    #         att_out = self.attention_subset(x_S_sub)
-    #         for n in subset:
-    #             z_dict[n.item()].append(att_out[torch.where(n == subset)[0].item()])
-    #     results = []
-    #     for k, v_l in z_dict.items():
-    #         zs = torch.stack(v_l, dim=0)
-    #         results.append(self.attention_agg(zs.narrow(0, 0, 1), zs, zs))
-    #     z_S = torch.stack(results, dim=0)
-    #     return z_S
+        self.attention_subset = ManifoldAttention(manifold, in_dim, hidden_dim, out_dim)
+        self.attention_agg = ManifoldAttention(manifold, out_dim, hidden_dim, out_dim)
 
     def forward(self, x_S, batch_data):
         """
@@ -116,12 +73,13 @@ class SphericalStructureLearner(nn.Module):
 
 
 class ManifoldAttention(nn.Module):
-    def __init__(self, manifold, in_dim):
+    def __init__(self, manifold, in_dim, hidden_dim, out_dim):
         super(ManifoldAttention, self).__init__()
         self.manifold = manifold
-        self.q_lin = ConstCurveLinear(manifold, in_dim, in_dim, bias=False)
-        self.k_lin = ConstCurveLinear(manifold, in_dim, in_dim, bias=False)
-        self.v_lin = ConstCurveLinear(manifold, in_dim, in_dim, bias=False)
+        self.q_lin = ConstCurveLinear(manifold, in_dim, hidden_dim, bias=False)
+        self.k_lin = ConstCurveLinear(manifold, in_dim, hidden_dim, bias=False)
+        self.v_lin = ConstCurveLinear(manifold, in_dim, hidden_dim, bias=False)
+        self.proj = ConstCurveLinear(manifold, hidden_dim, out_dim, bias=False)
 
     def forward(self, x_q, x_k=None, x_v=None, edge_index=None, agg_index=None):
         if x_k is None:
@@ -143,6 +101,7 @@ class ManifoldAttention(nn.Module):
             denorm = self.manifold.inner(None, out, keepdim=True)
             denorm = denorm.abs().clamp_min(1e-8).sqrt()
             out = 1. / self.manifold.k.sqrt() * out / denorm
+        out = self.proj(out)
         return out
 
     def global_attention(self, q, k, v):
