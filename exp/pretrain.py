@@ -34,8 +34,10 @@ class Pretrain:
 
     def build_model(self):
         model = GeoGFM(n_layers=self.configs.n_layers, in_dim=input_dim_dict[self.configs.dataset],
-                        out_dim=self.configs.embed_dim, bias=self.configs.bias,
-                        dropout=self.configs.dropout, activation=act_fn(self.configs.activation)).to(self.device)
+                      hidden_dim=self.configs.hidden_dim, embed_dim=self.configs.embed_dim,
+                      bias=self.configs.bias,
+                      dropout=self.configs.dropout,
+                       activation=act_fn(self.configs.activation)).to(self.device)
         self.model = model
 
     def train(self, load=False):
@@ -46,17 +48,16 @@ class Pretrain:
         early_stop = EarlyStopping(self.configs.patience)
         dataset, dataloader = self.load_data(self.configs.pretrain_level)
         optimizer = Adam(self.model.parameters(), lr=self.configs.lr, weight_decay=self.configs.weight_decay)
-        criterion = None    # TODO: self-supervised loss
-        for epoch in range(self.configs.pretrain_epoch):
+        for epoch in range(self.configs.pretrain_epochs):
             epoch_loss = []
             for data in dataloader:
                 data = data.to(self.device)
                 optimizer.zero_grad()
                 output = self.model(data)
-                loss = criterion(output)
+                loss = self.model.loss(output, data)
                 loss.backward()
                 optimizer.step()
                 epoch_loss.append(loss.item())
             train_loss = np.mean(epoch_loss)
             self.logger.info(f"Epoch {epoch}: train_loss={train_loss}")
-            early_stop(train_loss, self.model, self.configs.checkpoints + self.configs.pretrained_model_path)
+            early_stop(train_loss, self.model, self.configs.checkpoints, self.configs.pretrained_model_path)

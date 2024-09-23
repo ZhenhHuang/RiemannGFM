@@ -14,9 +14,9 @@ np.random.seed(seed)
 parser = argparse.ArgumentParser(description='Geometric Graph Foundation Model')
 
 """Dataset settings"""
-parser.add_argument('--task', type=str, default='LP',
+parser.add_argument('--task', type=str, default='NC',
                     choices=['NC', 'LP', 'GC'])
-parser.add_argument('--dataset', type=str, default='Cora',
+parser.add_argument('--dataset', type=str, default='KarateClub',
                     help=['computers', 'photo', 'KarateClub', 'CS', 'Physics'])
 parser.add_argument('--root_path', type=str, default='./datasets')
 parser.add_argument('--hops', type=int, nargs='+', default=[5, 2], help='Number of hops of sub-graph')
@@ -81,8 +81,11 @@ if configs.pretrained_model_path is None:
 if configs.log_name is None:
     configs.log_name = f"{configs.task}_{configs.dataset}.log"
 
+pretrain_exp = Pretrain(configs)
+pretrain_exp.train()
+
 if configs.task == 'NC':
-    exp = NodeClassification(configs)
+    exp = NodeClassification(configs, load=True, finetune=True)
 elif configs.task == 'LP':
     exp = LinkPrediction(configs)
 else:

@@ -1,6 +1,7 @@
 from torch_geometric.data import Data, Dataset, Batch
 from torch_geometric.data.data import BaseData
 from data.graph_exacters import graph_exacter, hierarchical_exacter
+from torch_geometric.utils import negative_sampling
 import torch
 
 
@@ -17,6 +18,8 @@ class PretrainingNodeDataset(Dataset):
 
     def _extract(self):
         data = self.raw_dataset[0].clone()
+        neg_edge_index = negative_sampling(data.edge_index)
+        data.neg_edge_index = neg_edge_index
         data = graph_exacter(data, self.configs.hops)
         return data
 

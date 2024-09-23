@@ -4,7 +4,8 @@ import torch.nn.functional as F
 import torch.nn as nn
 from modules.layers import EuclideanEncoder, ManifoldEncoder
 from modules.basics import HyperbolicStructureLearner, SphericalStructureLearner
-from manifolds import Lorentz, Sphere
+from manifolds import Euclidean, Lorentz, Sphere, ProductSpace
+from torch_scatter import scatter_mean
 
 
 class GeoGFM(nn.Module):
@@ -12,10 +13,14 @@ class GeoGFM(nn.Module):
         super(GeoGFM, self).__init__()
         self.manifold_H = Lorentz()
         self.manifold_S = Sphere()
+        self.product = ProductSpace(*[(Euclidean(), embed_dim),
+                                      (self.manifold_H, embed_dim),
+                                      (self.manifold_S, embed_dim)])
         self.init_block = InitBlock(self.manifold_H, self.manifold_S, in_dim, hidden_dim, embed_dim, bias, activation, dropout)
         self.blocks = nn.ModuleList([])
         for i in range(n_layers):
             self.blocks.append(StructuralBlock(self.manifold_H, self.manifold_S, embed_dim, hidden_dim, embed_dim))
+        self.eps_net = EpsNet(3 * embed_dim, embed_dim, dropout)
 
     def forward(self, data):
         """
@@ -28,6 +33,35 @@ class GeoGFM(nn.Module):
         for i, block in enumerate(self.blocks):
             x_H, x_S = block((x_H, x_S), data)
         return x_E, x_H, x_S
+
+    def loss(self, x_tuple, data):
+        """
+
+        :param x_tuple: (x_E, x_H, x_S)
+        :param data:
+        :return:
+        """
+        batch_data = data.batch_data[0]
+        node_labels = batch_data.node_labels
+        batch = batch_data.batch
+        edge_index = data.edge_index
+        neg_edge_index = data.neg_edge_index
+        edges = torch.cat([edge_index, neg_edge_index], dim=-1)
+
+        x = torch.cat(x_tuple, dim=-1)
+        d_p = self.product.dist(x[edges[0]], x[edges[1]])
+
+        x_rep = x[node_labels]
+        mask_src = (batch[None] == edges[0][:, None])
+        mask_dst = (batch[None] == edges[1][:, None])
+        mask = mask_src.unsqueeze(-2) & mask_dst.unsqueeze(-1)
+        idx, src, dst = torch.where(mask)
+        x_src, x_dst = x_rep[src], x_rep[dst]
+        d_G = scatter_mean(self.product.dist(x_src, x_dst), idx, dim=0)
+
+        eps = self.eps_net(x_src, x_dst)
+        loss = torch.mean(torch.relu(d_p - d_G + eps))
+        return loss
 
 
 class InitBlock(nn.Module):
@@ -68,6 +102,26 @@ class StructuralBlock(nn.Module):
         x_H = self.Hyp_learner(x_H, data.batch_tree[0])
         x_S = self.Sph_learner(x_S, data.batch_data[0])
         return x_H, x_S
+
+
+class EpsNet(nn.Module):
+    def __init__(self, in_dim, hidden_dim, dropout):
+        super(EpsNet, self).__init__()
+        self.lin1 = nn.Linear(in_dim, hidden_dim)
+        self.drop = nn.Dropout(dropout)
+        self.lin2 = nn.Linear(2 * hidden_dim, 1)
+
+    def forward(self, x, y):
+        """
+
+        :param x: src nodes
+        :param y: dst nodes
+        :return:
+        """
+        x, y = self.lin1(x), self.lin1(y)
+        z = torch.concat([x, y], dim=-1)
+        z = self.lin2(self.drop(z))
+        return z.unsqueeze(-1)
 
 
 # if __name__ == '__main__':

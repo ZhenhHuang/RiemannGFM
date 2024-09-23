@@ -9,6 +9,7 @@ from utils.evall_utils import cal_accuracy, cal_AUC_AP
 from utils.logger import create_logger
 from data import NodeClsDataset, LinkPredDataset, load_data, input_dim_dict, class_num_dict
 from torch_geometric.loader import DataLoader
+import os
 
 
 class SupervisedExp:
@@ -26,12 +27,15 @@ class SupervisedExp:
                                       bias=self.configs.bias,
                                       dropout=self.configs.dropout, activation=act_fn(self.configs.activation))
             if load:
-                pretrained_model = pretrained_model.load_state_dict(
-                    torch.load(self.configs.checkpoints + self.configs.pretrained_model_path)
+                path = os.path.join(self.configs.checkpoints, self.configs.pretrained_model_path)
+                self.logger.info(f"---------------Loading pretrained models from {path}-------------")
+                pretrained_model.load_state_dict(
+                    torch.load(path)
                 )
         if finetune:
-            for module in self.pretrained_model.modules():
-                if not isinstance(module, [EuclideanEncoder, ManifoldEncoder]):
+            self.logger.info("----------Freezing weights-----------")
+            for module in pretrained_model.modules():
+                if not isinstance(module, (EuclideanEncoder, ManifoldEncoder)):
                     for param in module.parameters():
                         param.requires_grad = False
         self.pretrained_model = pretrained_model.to(self.device)
