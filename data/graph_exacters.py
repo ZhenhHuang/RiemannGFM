@@ -23,6 +23,7 @@ def graph_exacter(data: Data, k_hop):
         tree_list.append(Data(edge_index=tree_edge_index, num_nodes=subset.shape[0], seed_node=node))
     node_labels = torch.cat(node_labels, dim=0)
     batch_data = Batch.from_data_list(data_list)
+    batch_data.node_labels = node_labels
     batch_tree = Batch.from_data_list(tree_list)
     batch_tree.node_labels = node_labels
     data.batch_data = batch_data

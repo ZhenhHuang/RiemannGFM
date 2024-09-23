@@ -2,7 +2,7 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 import torch.nn as nn
-from layers import ConstCurveLinear, ConstCurveAgg
+from modules.layers import ConstCurveLinear, ConstCurveAgg
 from manifolds import Sphere, Lorentz
 from torch_scatter import scatter_sum, scatter_softmax
 

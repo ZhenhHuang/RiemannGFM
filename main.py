@@ -3,7 +3,7 @@ import numpy as np
 import os
 import random
 import argparse
-from exp import Exp
+from exp import *
 from utils.logger import create_logger
 
 seed = 3047
@@ -15,8 +15,8 @@ parser = argparse.ArgumentParser(description='Geometric Graph Foundation Model')
 
 """Dataset settings"""
 parser.add_argument('--task', type=str, default='NC',
-                    choices=['NC', 'LP'])
-parser.add_argument('--dataset', type=str, default='Physics',
+                    choices=['NC', 'LP', 'GC'])
+parser.add_argument('--dataset', type=str, default='KarateClub',
                     choices=['computers', 'photo', 'KarateClub', 'CS', 'Physics'])
 parser.add_argument('--root_path', type=str, default='./datasets')
 parser.add_argument('--k_hop', type=int, default=2, help='Number of hops of sub-graph')
@@ -24,11 +24,11 @@ parser.add_argument('--k_hop', type=int, default=2, help='Number of hops of sub-
 """Checkpoints and logger"""
 parser.add_argument('--checkpoints', type=str, default='./checkpoints/')
 parser.add_argument('--pretrained_model_path', type=str)  # necessary
-parser.add_argument('--log_dir', type=str, default='./logs')
+parser.add_argument('--log_dir', type=str, default='./logs/')
 parser.add_argument('--log_name', type=str)  # necessary
 
 """Model configurations"""
-parser.add_argument('n_layers', type=int, default=2)
+parser.add_argument('--n_layers', type=int, default=1)
 parser.add_argument('--bias', type=bool, default=True)
 parser.add_argument('--dropout', type=float, default=0.1)
 parser.add_argument('--embed_dim', type=int, default=32, help='Embedding dimension of Pretrained model')
@@ -70,3 +70,16 @@ parser.add_argument('--gpu', type=int, default=0, help='gpu')
 parser.add_argument('--devices', type=str, default='0,1', help='device ids of multiple gpus')
 
 configs = parser.parse_args()
+
+if not os.path.exists(configs.checkpoints):
+    os.mkdir(configs.checkpoints)
+if not os.path.exists(configs.log_dir):
+    os.mkdir(configs.log_dir)
+if configs.pretrained_model_path is None:
+    configs.pretrained_model_path = f"{configs.task}_{configs.dataset}_model.pt"
+if configs.log_name is None:
+    configs.log_name = f"{configs.task}_{configs.dataset}.log"
+
+
+exp = NodeClassification(configs)
+exp.train()

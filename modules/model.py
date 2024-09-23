@@ -2,8 +2,8 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 import torch.nn as nn
-from layers import EuclideanEncoder, ManifoldEncoder
-from basics import HyperbolicStructureLearner, SphericalStructureLearner
+from modules.layers import EuclideanEncoder, ManifoldEncoder
+from modules.basics import HyperbolicStructureLearner, SphericalStructureLearner
 from manifolds import Lorentz, Sphere
 
 
@@ -65,8 +65,8 @@ class StructuralBlock(nn.Module):
         :return: x_tuple: (x_H, x_S)
         """
         x_H, x_S = x_tuple
-        x_H = self.Hyp_learner(x_H, data.batch_tree)
-        x_S = self.Sph_learner(x_S, data.batch_data)
+        x_H = self.Hyp_learner(x_H, data.batch_tree[0])
+        x_S = self.Sph_learner(x_S, data.batch_data[0])
         return x_H, x_S
 
 

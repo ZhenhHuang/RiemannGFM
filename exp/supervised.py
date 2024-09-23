@@ -12,7 +12,7 @@ from torch_geometric.loader import DataLoader
 
 
 class SupervisedExp:
-    def __init__(self, configs, pretrained_model=None):
+    def __init__(self, configs, pretrained_model=None, load=False, finetune=False):
         self.configs = configs
         self.logger = create_logger(self.configs.log_dir + self.configs.log_name)
         if self.configs.use_gpu and torch.cuda.is_available():
@@ -24,13 +24,15 @@ class SupervisedExp:
             pretrained_model = GeoGFM(n_layers=self.configs.n_layers, in_dim=input_dim_dict[self.configs.dataset],
                                       out_dim=self.configs.embed_dim, bias=self.configs.bias,
                                       dropout=self.configs.dropout, activation=act_fn(self.configs.activation))
-            pretrained_model = pretrained_model.load_state_dict(
-                torch.load(self.configs.checkpoints + self.configs.pretrained_model_path)
-            )
-        for module in self.pretrained_model.modules():
-            if not isinstance(module, [EuclideanEncoder, ManifoldEncoder]):
-                for param in module.parameters():
-                    param.requires_grad = False
+            if load:
+                pretrained_model = pretrained_model.load_state_dict(
+                    torch.load(self.configs.checkpoints + self.configs.pretrained_model_path)
+                )
+        if finetune:
+            for module in self.pretrained_model.modules():
+                if not isinstance(module, [EuclideanEncoder, ManifoldEncoder]):
+                    for param in module.parameters():
+                        param.requires_grad = False
         self.pretrained_model = pretrained_model.to(self.device)
 
     def load_model(self):
@@ -57,8 +59,8 @@ class SupervisedExp:
 
 class NodeClassification(SupervisedExp):
     # TODO: Transductive or Inductive
-    def __init__(self, configs, pretrained_model=None):
-        super(NodeClassification, self).__init__(configs, pretrained_model)
+    def __init__(self, configs, pretrained_model=None, load=False, finetune=False):
+        super(NodeClassification, self).__init__(configs, pretrained_model, load, finetune)
         self.nc_model = self.load_model()
 
     def load_model(self):
@@ -137,16 +139,16 @@ class NodeClassification(SupervisedExp):
 
     def cal_loss(self, output, label, mask):
         # TODO: Inductive loss or transductive loss
-        out = output[mask]
-        y = label[mask]
+        out = output
+        y = label
         loss = F.cross_entropy(out, y)
-        acc = cal_accuracy(out, y)
+        acc = cal_accuracy(out.detach().cpu().numpy(), y.cpu().numpy())
         return loss, acc
 
 
 class LinkPrediction(SupervisedExp):
-    def __init__(self, configs, pretrained_model=None):
-        super(LinkPrediction, self).__init__(configs, pretrained_model)
+    def __init__(self, configs, pretrained_model=None, load=False, finetune=False):
+        super(LinkPrediction, self).__init__(configs, pretrained_model, load, finetune)
         self.lp_model = self.load_model()
 
     def load_data(self, split):
@@ -244,8 +246,8 @@ class LinkPrediction(SupervisedExp):
 
 
 class GraphClassification(SupervisedExp):
-    def __init__(self, configs, pretrained_model=None):
-        super(GraphClassification, self).__init__(configs, pretrained_model)
+    def __init__(self, configs, pretrained_model=None, load=False, finetune=False):
+        super(GraphClassification, self).__init__(configs, pretrained_model, load, finetune)
         self.gc_model = self.load_model()
 
     def load_model(self):

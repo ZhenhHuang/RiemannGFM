@@ -30,7 +30,7 @@ class PretrainingNodeDataset(Dataset):
 
 class NodeClsDataset(Dataset):
     """
-    A dataset for node classification that contains only one graph.
+    An inductive dataset for node classification that contains only one graph.
     """
     def __init__(self, raw_dataset: Dataset, configs, split: str = "train"):
         super(NodeClsDataset, self).__init__()

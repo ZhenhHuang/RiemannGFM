@@ -4,7 +4,7 @@ import torch.nn.functional as F
 import torch.nn as nn
 
 
-class NodeClsHead(nn.modules):
+class NodeClsHead(nn.Module):
     def __init__(self, pretrained_model, in_dim, num_cls):
         """
 
@@ -30,7 +30,7 @@ class NodeClsHead(nn.modules):
         return self.head(x)
 
 
-class GraphClsHead(nn.modules):
+class GraphClsHead(nn.Module):
     def __init__(self, pretrained_model, in_dim, num_cls):
         super(GraphClsHead, self).__init__()
         self.pretrained_model = pretrained_model
@@ -49,7 +49,7 @@ class GraphClsHead(nn.modules):
         return self.head(x)
 
 
-class LinkPredHead(nn.modules):
+class LinkPredHead(nn.Module):
     def __init__(self, pretrained_model, in_dim, out_dim):
         super(LinkPredHead, self).__init__()
         self.pretrained_model = pretrained_model
