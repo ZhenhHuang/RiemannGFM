@@ -62,9 +62,8 @@ class NodeClassification(SupervisedExp):
         self.nc_model = self.load_model()
 
     def load_model(self):
-        cls_head = NodeClsHead(self.configs.embed_dim,
+        nc_model = NodeClsHead(self.pretrained_model, 3 * self.configs.embed_dim,
                                class_num_dict[self.configs.dataset]).to(self.device)
-        nc_model = nn.Sequential(self.pretrained_model, cls_head)
         return nc_model
 
     def load_data(self, split: str):
@@ -99,6 +98,8 @@ class NodeClassification(SupervisedExp):
             if epoch % self.configs.val_every == 0:
                 val_loss, val_acc = self.val(val_loader)
                 self.logger.info(f"Epoch {epoch}: val_loss={val_loss}, val_acc={val_acc * 100: .2f}%")
+        test_acc = self.test()
+        self.logger.info(f"test_acc={test_acc * 100: .2f}%")
 
     def train_step(self, data, optimizer):
         optimizer.zero_grad()
@@ -157,8 +158,9 @@ class LinkPrediction(SupervisedExp):
         return dataset, dataloader
 
     def load_model(self):
-        cls_head = LinkPredHead(self.configs.embed_dim, self.configs.embed_dim_lp).to(self.device)
-        lp_model = nn.Sequential(self.pretrained_model, cls_head)
+        lp_model = LinkPredHead(self.pretrained_model,
+                                3 * self.configs.embed_dim,
+                                self.configs.embed_dim_lp).to(self.device)
         return lp_model
 
     def train(self):
@@ -188,10 +190,13 @@ class LinkPrediction(SupervisedExp):
                 val_loss, val_auc, val_ap = self.val(val_loader)
                 self.logger.info(f"Epoch {epoch}: val_loss={val_loss}, val_auc={val_auc * 100: .2f}%, "
                             f"val_ap={val_ap * 100: .2f}%")
+        test_auc, test_ap = self.test()
+        self.logger.info(f"test_auc={test_auc * 100: .2f}%, "
+                         f"test_ap={test_ap * 100: .2f}%")
 
     def train_step(self, data, optimizer):
         optimizer.zero_grad()
-        out_pos, out_neg = self.lp_model(data, data.edge_index, data.neg_edge_index)
+        out_pos, out_neg = self.lp_model(data)
         loss, pred, label = self.cal_loss(out_pos, out_neg)
         loss.backward()
         optimizer.step()
@@ -205,7 +210,7 @@ class LinkPrediction(SupervisedExp):
         with torch.no_grad():
             for data in val_loader:
                 data = data.to(self.device)
-                out_pos, out_neg = self.lp_model(data, data.edge_index, data.neg_edge_inde)
+                out_pos, out_neg = self.lp_model(data)
                 loss, pred, label = self.cal_loss(out_pos, out_neg)
                 val_loss.append(loss.item())
                 val_label += label
@@ -223,7 +228,7 @@ class LinkPrediction(SupervisedExp):
         with torch.no_grad():
             for data in test_loader:
                 data = data.to(self.device)
-                out_pos, out_neg = self.lp_model(data, data.edge_index, data.neg_edge_inde)
+                out_pos, out_neg = self.lp_model(data)
                 loss, pred, label = self.cal_loss(out_pos, out_neg)
                 test_label += label
                 test_pred += pred
@@ -244,9 +249,8 @@ class GraphClassification(SupervisedExp):
         self.gc_model = self.load_model()
 
     def load_model(self):
-        cls_head = nn.Linear(self.configs.out_dim,
+        gc_model = nn.Linear(self.pretrained_model, 3 * self.configs.embed_dim,
                              class_num_dict[self.configs.dataset]).to(self.device)
-        gc_model = nn.Sequential(self.pretrained_model, cls_head)
         return gc_model
 
     def load_data(self, split):
@@ -274,10 +278,12 @@ class GraphClassification(SupervisedExp):
             if epoch % self.configs.val_every == 0:
                 val_loss, val_acc = self.val()
                 self.logger.info(f"Epoch {epoch}: val_loss={val_loss}, val_acc={val_acc * 100: .2f}%")
+        test_acc = self.test()
+        self.logger.info(f"test_acc={test_acc * 100: .2f}%")
 
     def train_step(self, data, optimizer):
         optimizer.zero_grad()
-        out = self.gc_model()
+        out = self.gc_model(data)
         loss = F.cross_entropy(out, data.y)
         loss.backward()
         optimizer.step()
@@ -291,7 +297,7 @@ class GraphClassification(SupervisedExp):
         val_correct = 0.
         with torch.no_grad():
             for data in self.dataloader:
-                out = self.gc_model()
+                out = self.gc_model(data)
                 loss = F.cross_entropy(out, data.y)
                 val_loss.append(loss.item())
                 pred = out.argmax(dim=-1)
@@ -304,7 +310,7 @@ class GraphClassification(SupervisedExp):
         test_correct = 0.
         with torch.no_grad():
             for data in self.dataloader:
-                out = self.gc_model()
+                out = self.gc_model(data)
                 pred = out.argmax(dim=-1)
                 test_correct += (pred == data.y).sum().item()
         return test_correct / len(self.dataloader.dataset)
