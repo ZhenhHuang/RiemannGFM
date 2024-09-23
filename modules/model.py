@@ -16,10 +16,13 @@ class GeoGFM(nn.Module):
         self.product = ProductSpace(*[(Euclidean(), embed_dim),
                                       (self.manifold_H, embed_dim),
                                       (self.manifold_S, embed_dim)])
-        self.init_block = InitBlock(self.manifold_H, self.manifold_S, in_dim, hidden_dim, embed_dim, bias, activation, dropout)
+        self.init_block = InitBlock(self.manifold_H, self.manifold_S,
+                                    in_dim, hidden_dim, embed_dim, bias,
+                                    activation, dropout)
         self.blocks = nn.ModuleList([])
         for i in range(n_layers):
-            self.blocks.append(StructuralBlock(self.manifold_H, self.manifold_S, embed_dim, hidden_dim, embed_dim))
+            self.blocks.append(StructuralBlock(self.manifold_H, self.manifold_S,
+                                               embed_dim, hidden_dim, embed_dim, dropout))
         self.eps_net = EpsNet(3 * embed_dim, embed_dim, dropout)
 
     def forward(self, data):
@@ -85,12 +88,12 @@ class InitBlock(nn.Module):
 
 
 class StructuralBlock(nn.Module):
-    def __init__(self, manifold_H, manifold_S, in_dim, hidden_dim, out_dim):
+    def __init__(self, manifold_H, manifold_S, in_dim, hidden_dim, out_dim, dropout):
         super(StructuralBlock, self).__init__()
         self.manifold_H = manifold_H
         self.manifold_S = manifold_S
-        self.Hyp_learner = HyperbolicStructureLearner(self.manifold_H, in_dim, hidden_dim, out_dim)
-        self.Sph_learner = SphericalStructureLearner(self.manifold_S, in_dim, hidden_dim, out_dim)
+        self.Hyp_learner = HyperbolicStructureLearner(self.manifold_H, in_dim, hidden_dim, out_dim, dropout)
+        self.Sph_learner = SphericalStructureLearner(self.manifold_S, in_dim, hidden_dim, out_dim, dropout)
 
     def forward(self, x_tuple, data):
         """

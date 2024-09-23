@@ -5,15 +5,17 @@ import torch.nn as nn
 from modules.layers import ConstCurveLinear, ConstCurveAgg
 from manifolds import Sphere, Lorentz
 from torch_scatter import scatter_sum, scatter_softmax
+from torch_geometric.utils import dropout_edge
 
 
 class HyperbolicStructureLearner(nn.Module):
-    def __init__(self, manifold, in_dim, hidden_dim, out_dim):
+    def __init__(self, manifold, in_dim, hidden_dim, out_dim, dropout=0.1):
         super(HyperbolicStructureLearner, self).__init__()
         assert isinstance(manifold, Lorentz), "The manifold must be a Hyperboloid!"
         self.manifold = manifold
-        self.tree_agg = ManifoldAttention(manifold, in_dim, hidden_dim, out_dim)
-        self.attention_agg = ManifoldAttention(manifold, out_dim, hidden_dim, out_dim)
+        self.tree_agg = ManifoldAttention(manifold, in_dim, hidden_dim, out_dim, dropout)
+        self.attention_agg = ManifoldAttention(manifold, out_dim, hidden_dim, out_dim, dropout)
+        self.res_lin = nn.Linear(out_dim, out_dim)
 
     def forward(self, x_H, batch_tree):
         """
@@ -36,16 +38,18 @@ class HyperbolicStructureLearner(nn.Module):
             dim=0)
         agg_index = label_extend[att_index]
         z_H = self.attention_agg(x_extend, edge_index=att_index, agg_index=agg_index[0])
+        # z_H = self.manifold.expmap(z_H, self.manifold.proju(z_H, self.res_lin(z_H)))
         return z_H
 
 
 class SphericalStructureLearner(nn.Module):
-    def __init__(self, manifold, in_dim, hidden_dim, out_dim):
+    def __init__(self, manifold, in_dim, hidden_dim, out_dim, dropout=0.1):
         super(SphericalStructureLearner, self).__init__()
         assert isinstance(manifold, Sphere), "The manifold must be a Sphere!"
         self.manifold = manifold
-        self.attention_subset = ManifoldAttention(manifold, in_dim, hidden_dim, out_dim)
-        self.attention_agg = ManifoldAttention(manifold, out_dim, hidden_dim, out_dim)
+        self.attention_subset = ManifoldAttention(manifold, in_dim, hidden_dim, out_dim, dropout)
+        self.attention_agg = ManifoldAttention(manifold, out_dim, hidden_dim, out_dim, dropout)
+        self.res_lin = nn.Linear(out_dim, out_dim)
 
     def forward(self, x_S, batch_data):
         """
@@ -69,17 +73,18 @@ class SphericalStructureLearner(nn.Module):
             dim=0)
         agg_index = label_extend[att_index]
         z_S = self.attention_agg(x_extend, edge_index=att_index, agg_index=agg_index[0])
+        z_S = self.manifold.expmap(z_S, self.manifold.proju(z_S, self.res_lin(z_S)))
         return z_S
 
 
 class ManifoldAttention(nn.Module):
-    def __init__(self, manifold, in_dim, hidden_dim, out_dim):
+    def __init__(self, manifold, in_dim, hidden_dim, out_dim, dropout):
         super(ManifoldAttention, self).__init__()
         self.manifold = manifold
-        self.q_lin = ConstCurveLinear(manifold, in_dim, hidden_dim, bias=False)
-        self.k_lin = ConstCurveLinear(manifold, in_dim, hidden_dim, bias=False)
-        self.v_lin = ConstCurveLinear(manifold, in_dim, hidden_dim, bias=False)
-        self.proj = ConstCurveLinear(manifold, hidden_dim, out_dim, bias=False)
+        self.q_lin = ConstCurveLinear(manifold, in_dim, hidden_dim, bias=False, dropout=dropout)
+        self.k_lin = ConstCurveLinear(manifold, in_dim, hidden_dim, bias=False, dropout=dropout)
+        self.v_lin = ConstCurveLinear(manifold, in_dim, hidden_dim, bias=False, dropout=dropout)
+        self.proj = ConstCurveLinear(manifold, hidden_dim, out_dim, bias=False, dropout=dropout)
 
     def forward(self, x_q, x_k=None, x_v=None, edge_index=None, agg_index=None):
         if x_k is None:
