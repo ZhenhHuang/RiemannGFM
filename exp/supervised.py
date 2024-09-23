@@ -7,7 +7,7 @@ from modules import *
 from utils.train_utils import EarlyStopping, act_fn
 from utils.evall_utils import cal_accuracy, cal_AUC_AP
 from utils.logger import create_logger
-from data import NodeClsDataset, LinkPredDataset, load_data, input_dim_dict
+from data import NodeClsDataset, LinkPredDataset, load_data, input_dim_dict, class_num_dict
 from torch_geometric.loader import DataLoader
 
 
@@ -62,7 +62,8 @@ class NodeClassification(SupervisedExp):
         self.nc_model = self.load_model()
 
     def load_model(self):
-        cls_head = NodeClsHead(self.configs.embed_dim, self.dataset.num_classes).to(self.device)
+        cls_head = NodeClsHead(self.configs.embed_dim,
+                               class_num_dict[self.configs.dataset]).to(self.device)
         nc_model = nn.Sequential(self.pretrained_model, cls_head)
         return nc_model
 
@@ -76,7 +77,8 @@ class NodeClassification(SupervisedExp):
 
     def train(self):
         self.nc_model.train()
-        optimizer = Adam(self.nc_model.parameters(), lr=self.configs.lr_nc, weight_decay=self.configs.weight_decay_nc)
+        optimizer = Adam(self.nc_model.parameters(), lr=self.configs.lr_nc,
+                         weight_decay=self.configs.weight_decay_nc)
         train_set, train_loader = self.load_data("train")
         val_set, val_loader = self.load_data("val")
         for epoch in range(self.configs.nc_epochs):
@@ -242,7 +244,8 @@ class GraphClassification(SupervisedExp):
         self.gc_model = self.load_model()
 
     def load_model(self):
-        cls_head = nn.Linear(self.configs.out_dim, self.dataset.num_classes)
+        cls_head = nn.Linear(self.configs.out_dim,
+                             class_num_dict[self.configs.dataset]).to(self.device)
         gc_model = nn.Sequential(self.pretrained_model, cls_head)
         return gc_model
 
@@ -252,7 +255,8 @@ class GraphClassification(SupervisedExp):
 
     def train(self):
         self.gc_model.train()
-        optimizer = Adam(self.gc_model.parameters(), lr=self.configs.lr_gc, weight_decay=self.configs.weight_decay_gc)
+        optimizer = Adam(self.gc_model.parameters(), lr=self.configs.lr_gc,
+                         weight_decay=self.configs.weight_decay_gc)
         for epoch in range(self.configs.gc_epochs):
             epoch_loss = []
             epoch_correct = 0.

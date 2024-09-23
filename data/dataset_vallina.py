@@ -6,6 +6,7 @@ from torch_geometric.transforms import RandomNodeSplit
 
 
 input_dim_dict = {"KarateClub": 34}
+class_num_dict = {{"KarateClub": 4}}
 
 
 def load_data(root: str, data_name: str, split='public', num_val=0.1, num_test=0.8) -> Dataset:

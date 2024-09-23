@@ -13,7 +13,7 @@ class NodeClsHead(nn.modules):
         """
         super(NodeClsHead, self).__init__()
         self.head = nn.Linear(in_dim, num_cls)
-
+    
     def forward(self, x_tuple):
         x = torch.concat(x_tuple, dim=-1)
         return self.head(x)
