@@ -47,6 +47,7 @@ class GeoGFM(nn.Module):
         edge_index = data.edge_index
         neg_edge_index = data.neg_edge_index
         edges = torch.cat([edge_index, neg_edge_index], dim=-1)
+        rank = torch.tensor([1.] * edge_index.shape[-1] + [-1.] * neg_edge_index.shape[-1]).to(edges.device)
 
         x = torch.cat(x_tuple, dim=-1)
         d_p = self.product.dist(x[edges[0]], x[edges[1]])
@@ -60,7 +61,7 @@ class GeoGFM(nn.Module):
         d_G = scatter_mean(self.product.dist(x_src, x_dst), idx, dim=0)
 
         eps = self.eps_net(x_src, x_dst)
-        loss = torch.mean(torch.relu(d_p - d_G + eps))
+        loss = F.relu(rank * (d_p - d_G) + eps).mean()
         return loss
 
 

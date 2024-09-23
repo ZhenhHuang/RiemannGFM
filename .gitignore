@@ -162,4 +162,7 @@ cython_debug/
 .idea/
 
 # Dataset
-datasets
+datasets/
+
+checkpoints/
+logs/

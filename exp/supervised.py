@@ -7,7 +7,7 @@ from modules import *
 from utils.train_utils import EarlyStopping, act_fn
 from utils.evall_utils import cal_accuracy, cal_AUC_AP
 from utils.logger import create_logger
-from data import NodeClsDataset, LinkPredDataset, load_data, input_dim_dict, class_num_dict
+from data import *
 from torch_geometric.loader import DataLoader
 import os
 
@@ -63,7 +63,6 @@ class SupervisedExp:
 
 
 class NodeClassification(SupervisedExp):
-    # TODO: Transductive or Inductive
     def __init__(self, configs, pretrained_model=None, load=False, finetune=False):
         super(NodeClassification, self).__init__(configs, pretrained_model, load, finetune)
         self.nc_model = self.load_model()
@@ -74,10 +73,16 @@ class NodeClassification(SupervisedExp):
         return nc_model
 
     def load_data(self, split: str):
-        dataset = NodeClsDataset(raw_dataset=load_data(root=self.configs.root_path,
-                                                       data_name=self.configs.dataset),
-                                 configs=self.configs,
-                                 split=split)
+        if self.configs.nc_mode == 'Inductive':
+            dataset = InductiveNodeClsDataset(raw_dataset=load_data(root=self.configs.root_path,
+                                                                    data_name=self.configs.dataset),
+                                              configs=self.configs,
+                                              split=split)
+        else:
+            dataset = TransductiveNodeClsDataset(raw_dataset=load_data(root=self.configs.root_path,
+                                                                    data_name=self.configs.dataset),
+                                              configs=self.configs,
+                                              split=split)
         dataloader = DataLoader(dataset, batch_size=1)
         return dataset, dataloader
 
@@ -87,6 +92,7 @@ class NodeClassification(SupervisedExp):
                          weight_decay=self.configs.weight_decay_nc)
         train_set, train_loader = self.load_data("train")
         val_set, val_loader = self.load_data("val")
+        early_stop = EarlyStopping(self.configs.patience)
         for epoch in range(self.configs.nc_epochs):
             epoch_loss = []
             epoch_acc = []
@@ -105,13 +111,17 @@ class NodeClassification(SupervisedExp):
             if epoch % self.configs.val_every == 0:
                 val_loss, val_acc = self.val(val_loader)
                 self.logger.info(f"Epoch {epoch}: val_loss={val_loss}, val_acc={val_acc * 100: .2f}%")
+                early_stop(val_loss, self.nc_model, self.configs.checkpoints, self.configs.task_model_path)
+                if early_stop.early_stop:
+                    print("---------Early stopping--------")
+                    break
         test_acc = self.test()
         self.logger.info(f"test_acc={test_acc * 100: .2f}%")
 
     def train_step(self, data, optimizer):
         optimizer.zero_grad()
         out = self.nc_model(data)
-        loss, acc = self.cal_loss(out, data.y, data.train_mask)
+        loss, acc = self.cal_loss(out, data.y, data.mask)
         loss.backward()
         optimizer.step()
         return loss.item(), acc
@@ -124,7 +134,7 @@ class NodeClassification(SupervisedExp):
             for data in val_loader:
                 data = data.to(self.device)
                 out = self.nc_model(data)
-                loss, acc = self.cal_loss(out, data.y, data.val_mask)
+                loss, acc = self.cal_loss(out, data.y, data.mask)
                 val_loss.append(loss.item())
                 val_acc.append(acc)
         self.nc_model.train()
@@ -138,14 +148,13 @@ class NodeClassification(SupervisedExp):
             for data in test_loader:
                 data = data.to(self.device)
                 out = self.nc_model(data)
-                loss, acc = self.cal_loss(out, data.y, data.test_mask)
+                loss, acc = self.cal_loss(out, data.y, data.mask)
                 test_acc.append(acc)
         return np.mean(test_acc)
 
     def cal_loss(self, output, label, mask):
-        # TODO: Inductive loss or transductive loss
-        out = output
-        y = label
+        out = output if self.configs.nc_mode == 'inductive' else output[mask]
+        y = label if self.configs.nc_mode == 'inductive' else label[mask]
         loss = F.cross_entropy(out, y)
         acc = cal_accuracy(out.detach().cpu().numpy(), y.cpu().numpy())
         return loss, acc
@@ -175,6 +184,7 @@ class LinkPrediction(SupervisedExp):
         optimizer = Adam(self.lp_model.parameters(), lr=self.configs.lr_lp, weight_decay=self.configs.weight_decay_lp)
         train_set, train_loader = self.load_data("train")
         val_set, val_loader = self.load_data("val")
+        early_stop = EarlyStopping(self.configs.patience)
         for epoch in range(self.configs.lp_epochs):
             epoch_loss = []
             epoch_label = []
@@ -197,6 +207,10 @@ class LinkPrediction(SupervisedExp):
                 val_loss, val_auc, val_ap = self.val(val_loader)
                 self.logger.info(f"Epoch {epoch}: val_loss={val_loss}, val_auc={val_auc * 100: .2f}%, "
                             f"val_ap={val_ap * 100: .2f}%")
+                early_stop(val_loss, self.nc_model, self.configs.checkpoints, self.configs.task_model_path)
+                if early_stop.early_stop:
+                    print("---------Early stopping--------")
+                    break
         test_auc, test_ap = self.test()
         self.logger.info(f"test_auc={test_auc * 100: .2f}%, "
                          f"test_ap={test_ap * 100: .2f}%")
@@ -268,6 +282,7 @@ class GraphClassification(SupervisedExp):
         self.gc_model.train()
         optimizer = Adam(self.gc_model.parameters(), lr=self.configs.lr_gc,
                          weight_decay=self.configs.weight_decay_gc)
+        early_stop = EarlyStopping(self.configs.patience)
         for epoch in range(self.configs.gc_epochs):
             epoch_loss = []
             epoch_correct = 0.
@@ -285,6 +300,10 @@ class GraphClassification(SupervisedExp):
             if epoch % self.configs.val_every == 0:
                 val_loss, val_acc = self.val()
                 self.logger.info(f"Epoch {epoch}: val_loss={val_loss}, val_acc={val_acc * 100: .2f}%")
+                early_stop(val_loss, self.nc_model, self.configs.checkpoints, self.configs.task_model_path)
+                if early_stop.early_stop:
+                    print("---------Early stopping--------")
+                    break
         test_acc = self.test()
         self.logger.info(f"test_acc={test_acc * 100: .2f}%")
 

@@ -42,9 +42,8 @@ class Pretrain:
 
     def train(self, load=False):
         if load:
-            self.model.load_state_dict(
-                torch.load(self.configs.checkpoints + self.configs.pretrained_model_path)
-            )
+            path = os.path.join(self.configs.checkpoints, self.configs.pretrained_model_path)
+            self.model.load_state_dict(torch.load(path))
         early_stop = EarlyStopping(self.configs.patience)
         dataset, dataloader = self.load_data(self.configs.pretrain_level)
         optimizer = Adam(self.model.parameters(), lr=self.configs.lr, weight_decay=self.configs.weight_decay)
@@ -61,3 +60,6 @@ class Pretrain:
             train_loss = np.mean(epoch_loss)
             self.logger.info(f"Epoch {epoch}: train_loss={train_loss}")
             early_stop(train_loss, self.model, self.configs.checkpoints, self.configs.pretrained_model_path)
+            if early_stop.early_stop:
+                print("---------Early stopping--------")
+                break
