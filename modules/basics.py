@@ -9,15 +9,16 @@ from torch_geometric.utils import dropout_edge
 
 
 class HyperbolicStructureLearner(nn.Module):
-    def __init__(self, manifold, in_dim, hidden_dim, out_dim, dropout=0.1):
+    def __init__(self, manifold_H, manifold_S, in_dim, hidden_dim, out_dim, dropout=0.1):
         super(HyperbolicStructureLearner, self).__init__()
-        assert isinstance(manifold, Lorentz), "The manifold must be a Hyperboloid!"
-        self.manifold = manifold
-        self.tree_agg = ManifoldAttention(manifold, in_dim, hidden_dim, out_dim, dropout)
-        self.attention_agg = ManifoldAttention(manifold, out_dim, hidden_dim, out_dim, dropout)
+        # assert isinstance(manifold, Lorentz), "The manifold must be a Hyperboloid!"
+        self.manifold_H = manifold_H
+        self.manifold_S = manifold_S
+        self.tree_agg = CrossManifoldAttention(manifold_S, manifold_H, in_dim, hidden_dim, out_dim, dropout)
+        self.attention_agg = ManifoldAttention(manifold_H, out_dim, hidden_dim, out_dim, dropout)
         self.res_lin = nn.Linear(out_dim, out_dim)
 
-    def forward(self, x_H, batch_tree):
+    def forward(self, x_H, x_S, batch_tree):
         """
         Local Attention based on BFS tree structure inherit from a sub-graph.
         :param x_H: Hyperbolic representation of nodes
@@ -26,8 +27,10 @@ class HyperbolicStructureLearner(nn.Module):
         """
         node_labels = batch_tree.node_labels
         x = x_H[node_labels]
+        x_res = x.clone()
         att_index = batch_tree.edge_index
-        x = self.tree_agg(x, edge_index=att_index)
+        x = self.tree_agg(x_S[node_labels], x, x, edge_index=att_index)
+        x = self.manifold_H.expmap(x, self.res_lin(x_res))
 
         x_extend = torch.concat([x, x_H], dim=0)
         label_extend = torch.cat(
@@ -38,7 +41,6 @@ class HyperbolicStructureLearner(nn.Module):
             dim=0)
         agg_index = label_extend[att_index]
         z_H = self.attention_agg(x_extend, edge_index=att_index, agg_index=agg_index[0])
-        # z_H = self.manifold.expmap(z_H, self.manifold.proju(z_H, self.res_lin(z_H)))
         return z_H
 
 
@@ -46,17 +48,19 @@ class SphericalStructureLearner(nn.Module):
     """
     in_dim = out_dim
     """
-    def __init__(self, manifold, in_dim, hidden_dim, out_dim, dropout=0.1):
+    def __init__(self, manifold_H, manifold_S, in_dim, hidden_dim, out_dim, dropout=0.1):
         super(SphericalStructureLearner, self).__init__()
-        assert isinstance(manifold, Sphere), "The manifold must be a Sphere!"
-        self.manifold = manifold
-        self.attention_subset = ManifoldAttention(manifold, in_dim, hidden_dim, out_dim, dropout)
-        self.attention_agg = ManifoldAttention(manifold, out_dim, hidden_dim, out_dim, dropout)
+        # assert isinstance(manifold, Sphere), "The manifold must be a Sphere!"
+        self.manifold_H = manifold_H
+        self.manifold_S = manifold_S
+        self.attention_subset = CrossManifoldAttention(manifold_H, manifold_S, in_dim, hidden_dim, out_dim, dropout)
+        self.attention_agg = ManifoldAttention(manifold_S, out_dim, hidden_dim, out_dim, dropout)
         self.res_lin = nn.Linear(out_dim, out_dim)
 
-    def forward(self, x_S, batch_data):
+    def forward(self, x_H, x_S, batch_data):
         """
 
+        :param x_H: Hyperbolic representation of nodes
         :param x_S: Sphere representation of nodes
         :param batch_data: a batch graph with sub-graphs from one graph.
         :return: New sphere representation of nodes.
@@ -66,8 +70,8 @@ class SphericalStructureLearner(nn.Module):
         x = x_S[node_labels]
         x_res = x.clone()
         att_index = torch.stack(torch.where(batch[None] == batch[:, None]), dim=0)
-        x = self.attention_subset(x, edge_index=att_index)
-        x = self.manifold.expmap(x, self.manifold.proju(x, self.res_lin(x_res)))
+        x = self.attention_subset(x_H[node_labels], x, x, edge_index=att_index)
+        x = self.manifold_S.expmap(x, self.manifold_S.proju(x, self.res_lin(x_res)))
 
         x_extend = torch.concat([x, x_S], dim=0)
         label_extend = torch.cat(
@@ -78,7 +82,6 @@ class SphericalStructureLearner(nn.Module):
             dim=0)
         agg_index = label_extend[att_index]
         z_S = self.attention_agg(x_extend, edge_index=att_index, agg_index=agg_index[0])
-        z_S = self.manifold.expmap(z_S, self.manifold.proju(z_S, self.res_lin(x_S)))
         return z_S
 
 
@@ -105,7 +108,7 @@ class ManifoldAttention(nn.Module):
         else:
             src, dst = edge_index[0], edge_index[1]
             agg_index = agg_index if agg_index is not None else src
-            score = self.manifold.inner(None, q[src], k[dst])
+            score = -self.manifold.dist2(q[src], k[dst])
             score = scatter_softmax(score, src, dim=-1)
             out = scatter_sum(score.unsqueeze(1) * v[dst], agg_index, dim=0)
             denorm = self.manifold.inner(None, out, keepdim=True)
@@ -118,6 +121,33 @@ class ManifoldAttention(nn.Module):
         scores = self.manifold.cinner(q, k)
         A = torch.softmax(scores, dim=-1)
         out = self.manifold.Frechet_mean(v.unsqueeze(0), A.unsqueeze(-1), dim=-2, keepdim=True).squeeze()
+        return out
+
+
+class CrossManifoldAttention(nn.Module):
+    def __init__(self, manifold_q, manifold_k, in_dim, hidden_dim, out_dim, dropout):
+        super(CrossManifoldAttention, self).__init__()
+        self.manifold_q = manifold_q
+        self.manifold_k = manifold_k
+        self.q_lin = ConstCurveLinear(manifold_q, in_dim, hidden_dim, bias=False, dropout=dropout)
+        self.k_lin = ConstCurveLinear(manifold_k, in_dim, hidden_dim, bias=False, dropout=dropout)
+        self.v_lin = ConstCurveLinear(manifold_k, in_dim, hidden_dim, bias=False, dropout=dropout)
+        self.proj = ConstCurveLinear(manifold_k, hidden_dim, out_dim, bias=False, dropout=dropout)
+
+    def forward(self, x_q, x_k, x_v, edge_index, agg_index=None):
+        q = self.manifold_q.logmap0(self.q_lin(x_q))
+        q = self.manifold_k.proju0(q)
+        k = self.manifold_k.logmap0(self.k_lin(x_k))
+        v = self.v_lin(x_v)
+        src, dst = edge_index[0], edge_index[1]
+        agg_index = agg_index if agg_index is not None else src
+        score = self.manifold_k.inner(None, q[src], k[dst])
+        score = scatter_softmax(score, src, dim=-1)
+        out = scatter_sum(score.unsqueeze(1) * v[dst], agg_index, dim=0)
+        denorm = self.manifold_k.inner(None, out, keepdim=True)
+        denorm = denorm.abs().clamp_min(1e-8).sqrt()
+        out = 1. / self.manifold_k.k.sqrt() * out / denorm
+        out = self.proj(out)
         return out
 
 

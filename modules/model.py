@@ -92,8 +92,8 @@ class StructuralBlock(nn.Module):
         super(StructuralBlock, self).__init__()
         self.manifold_H = manifold_H
         self.manifold_S = manifold_S
-        self.Hyp_learner = HyperbolicStructureLearner(self.manifold_H, in_dim, hidden_dim, out_dim, dropout)
-        self.Sph_learner = SphericalStructureLearner(self.manifold_S, in_dim, hidden_dim, out_dim, dropout)
+        self.Hyp_learner = HyperbolicStructureLearner(self.manifold_H, self.manifold_S, in_dim, hidden_dim, out_dim, dropout)
+        self.Sph_learner = SphericalStructureLearner(self.manifold_H, self.manifold_S, in_dim, hidden_dim, out_dim, dropout)
 
     def forward(self, x_tuple, data):
         """
@@ -103,8 +103,8 @@ class StructuralBlock(nn.Module):
         :return: x_tuple: (x_H, x_S)
         """
         x_H, x_S = x_tuple
-        x_H = self.Hyp_learner(x_H, data.batch_tree[0])
-        x_S = self.Sph_learner(x_S, data.batch_data[0])
+        x_H = self.Hyp_learner(x_H, x_S, data.batch_tree[0])
+        x_S = self.Sph_learner(x_H, x_S, data.batch_data[0])
         return x_H, x_S
 
 
