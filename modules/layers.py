@@ -16,13 +16,16 @@ class EuclideanEncoder(nn.Module):
     def __init__(self, in_dim, hidden_dim, out_dim, bias=True, activation=F.relu, dropout=0.1):
         super().__init__()
         self.lin = nn.Linear(in_dim, hidden_dim, bias=bias)
-        self.activation = activation
+        self.activation = F.relu
         self.proj = nn.Linear(hidden_dim, out_dim, bias=bias)
         self.drop = dropout
+        self.res_lin = nn.Linear(in_dim, out_dim, bias=bias)
 
     def forward(self, x):
+        x_res = x.clone()
         x = self.activation(self.lin(x))
         x = self.proj(F.dropout(x, p=self.drop, training=self.training))
+        x = self.res_lin(x_res) + x
         return x
 
 

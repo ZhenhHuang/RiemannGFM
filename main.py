@@ -32,8 +32,8 @@ parser.add_argument('--log_name', type=str)  # necessary
 """Model configurations"""
 parser.add_argument('--n_layers', type=int, default=2)
 parser.add_argument('--bias', type=bool, default=True)
-parser.add_argument('--dropout', type=float, default=0.3)
-parser.add_argument('--embed_dim', type=int, default=8, help='Embedding dimension of Pretrained model')
+parser.add_argument('--dropout', type=float, default=0.1)
+parser.add_argument('--embed_dim', type=int, default=16, help='Embedding dimension of Pretrained model')
 parser.add_argument('--hidden_dim', type=int, default=64)
 parser.add_argument('--activation', type=str, default=None)
 

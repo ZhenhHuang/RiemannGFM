@@ -72,8 +72,8 @@ class InitBlock(nn.Module):
     def __init__(self, manifold_H, manifold_S, in_dim, hidden_dim, out_dim, bias, activation, dropout):
         super(InitBlock, self).__init__()
         self.Euc_init = EuclideanEncoder(in_dim, hidden_dim, out_dim, bias, activation, dropout)
-        self.Hyp_init = ManifoldEncoder(manifold_H, in_dim, hidden_dim, out_dim, bias, None, 0.)
-        self.Sph_init = ManifoldEncoder(manifold_S, in_dim, hidden_dim, out_dim, bias, None, 0.)
+        self.Hyp_init = ManifoldEncoder(manifold_H, out_dim, hidden_dim, out_dim, bias, None, 0.)
+        self.Sph_init = ManifoldEncoder(manifold_S, out_dim, hidden_dim, out_dim, bias, None, 0.)
 
     def forward(self, x):
         """
@@ -82,8 +82,8 @@ class InitBlock(nn.Module):
         :return: (E, H, S) Manifold initial representations
         """
         E = self.Euc_init(x)
-        H = self.Hyp_init(x)
-        S = self.Sph_init(x)
+        H = self.Hyp_init(E)
+        S = self.Sph_init(E)
         return E, H, S
 
 
@@ -124,7 +124,7 @@ class EpsNet(nn.Module):
         """
         x, y = self.lin1(x), self.lin1(y)
         z = torch.concat([x, y], dim=-1)
-        z = self.lin2(self.drop(z))
+        z = F.relu(self.lin2(self.drop(z)))
         return z.unsqueeze(-1)
 
 

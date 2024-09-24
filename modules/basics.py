@@ -43,6 +43,9 @@ class HyperbolicStructureLearner(nn.Module):
 
 
 class SphericalStructureLearner(nn.Module):
+    """
+    in_dim = out_dim
+    """
     def __init__(self, manifold, in_dim, hidden_dim, out_dim, dropout=0.1):
         super(SphericalStructureLearner, self).__init__()
         assert isinstance(manifold, Sphere), "The manifold must be a Sphere!"
@@ -61,8 +64,10 @@ class SphericalStructureLearner(nn.Module):
         node_labels = batch_data.node_labels
         batch = batch_data.batch
         x = x_S[node_labels]
+        x_res = x.clone()
         att_index = torch.stack(torch.where(batch[None] == batch[:, None]), dim=0)
         x = self.attention_subset(x, edge_index=att_index)
+        x = self.manifold.expmap(x, self.manifold.proju(x, self.res_lin(x_res)))
 
         x_extend = torch.concat([x, x_S], dim=0)
         label_extend = torch.cat(
@@ -73,7 +78,7 @@ class SphericalStructureLearner(nn.Module):
             dim=0)
         agg_index = label_extend[att_index]
         z_S = self.attention_agg(x_extend, edge_index=att_index, agg_index=agg_index[0])
-        z_S = self.manifold.expmap(z_S, self.manifold.proju(z_S, self.res_lin(z_S)))
+        z_S = self.manifold.expmap(z_S, self.manifold.proju(z_S, self.res_lin(x_S)))
         return z_S
 
 
