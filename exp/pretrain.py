@@ -9,6 +9,7 @@ from utils.evall_utils import cal_accuracy, cal_AUC_AP
 from utils.logger import create_logger
 from data import load_data, PretrainingNodeDataset, input_dim_dict
 from torch_geometric.loader import DataLoader
+import os
 
 
 class Pretrain:
@@ -20,32 +21,38 @@ class Pretrain:
             self.device = torch.device('cuda')
         else:
             self.device = torch.device('cpu')
-        self.build_model()
+        # self.build_model()
+        self.data_name = None
 
     def load_data(self, task_level):
         if task_level == 'node':
-            dataset = PretrainingNodeDataset(load_data(root=self.configs.root_path,
-                                                       data_name=self.configs.dataset),
+            dataloader = PretrainingNodeDataset(load_data(root=self.configs.root_path,
+                                                       data_name=self.data_name),
                                              self.configs)
-            dataloader = DataLoader(dataset, batch_size=1)
+            # dataloader = DataLoader(dataset, batch_size=1)
         else:
             raise NotImplementedError
-        return dataset, dataloader
+        return dataloader
 
     def build_model(self):
-        model = GeoGFM(n_layers=self.configs.n_layers, in_dim=input_dim_dict[self.configs.dataset],
+        model = GeoGFM(n_layers=self.configs.n_layers, in_dim=input_dim_dict[self.data_name],
                       hidden_dim=self.configs.hidden_dim, embed_dim=self.configs.embed_dim,
                       bias=self.configs.bias,
                       dropout=self.configs.dropout,
                        activation=act_fn(self.configs.activation)).to(self.device)
         self.model = model
 
-    def train(self, load=False):
+    def _train(self, load=False):
         if load:
+            self.logger.info(f"---------------Loading pretrained models from {path}-------------")
             path = os.path.join(self.configs.checkpoints, self.configs.pretrained_model_path)
-            self.model.load_state_dict(torch.load(path))
+            pretrained_dict = torch.load(path)
+            model_dict = self.model.state_dict()
+            pretrained_dict = {k: v for k, v in pretrained_dict.items() if 'init_block' not in k}
+            model_dict.update(pretrained_dict)
+            self.model.load_state_dict(model_dict)
         early_stop = EarlyStopping(self.configs.patience)
-        dataset, dataloader = self.load_data(self.configs.pretrain_level)
+        dataloader = self.load_data(self.configs.pretrain_level)
         optimizer = Adam(self.model.parameters(), lr=self.configs.lr, weight_decay=self.configs.weight_decay)
         for epoch in range(self.configs.pretrain_epochs):
             epoch_loss = []
@@ -63,3 +70,16 @@ class Pretrain:
             if early_stop.early_stop:
                 print("---------Early stopping--------")
                 break
+
+    def pretrain(self):
+        if not isinstance(self.configs.pretrain_dataset, list):
+            self.configs.pretrain_dataset = [self.configs.pretrain_dataset]
+        for i, data_name in enumerate(self.configs.pretrain_dataset):
+            load = True
+            self.data_name = data_name
+            self.logger.info(f"----------Pretraining on {data_name}--------------")
+            self.build_model()
+            if i == 0:
+                load = False
+            self._train(load)
+            torch.cuda.empty_cache()

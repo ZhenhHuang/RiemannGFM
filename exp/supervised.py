@@ -2,6 +2,7 @@ import torch
 import torch.nn.functional as F
 import torch.nn as nn
 from torch.optim import Adam
+from geoopt.optim import RiemannianAdam
 import numpy as np
 from modules import *
 from utils.train_utils import EarlyStopping, act_fn
@@ -29,9 +30,13 @@ class SupervisedExp:
             if load:
                 path = os.path.join(self.configs.checkpoints, self.configs.pretrained_model_path)
                 self.logger.info(f"---------------Loading pretrained models from {path}-------------")
-                pretrained_model.load_state_dict(
-                    torch.load(path)
-                )
+
+                pretrained_dict = torch.load(path)
+                model_dict = pretrained_model.state_dict()
+                pretrained_dict = {k: v for k, v in pretrained_dict.items() if 'init_block' not in k}
+                model_dict.update(pretrained_dict)
+                pretrained_model.load_state_dict(model_dict)
+
         if finetune:
             self.logger.info("----------Freezing weights-----------")
             for module in pretrained_model.modules():
@@ -73,7 +78,7 @@ class NodeClassification(SupervisedExp):
         return nc_model
 
     def load_data(self, split: str):
-        if self.configs.nc_mode == 'Inductive':
+        if self.configs.nc_mode == 'inductive':
             dataset = InductiveNodeClsDataset(raw_dataset=load_data(root=self.configs.root_path,
                                                                     data_name=self.configs.dataset),
                                               configs=self.configs,
@@ -88,7 +93,7 @@ class NodeClassification(SupervisedExp):
 
     def train(self):
         self.nc_model.train()
-        optimizer = Adam(self.nc_model.parameters(), lr=self.configs.lr_nc,
+        optimizer = RiemannianAdam(self.nc_model.parameters(), lr=self.configs.lr_nc,
                          weight_decay=self.configs.weight_decay_nc)
         train_set, train_loader = self.load_data("train")
         val_set, val_loader = self.load_data("val")

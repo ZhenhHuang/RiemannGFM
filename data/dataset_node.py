@@ -3,6 +3,7 @@ from torch_geometric.data.data import BaseData
 from data.graph_exacters import graph_exacter, hierarchical_exacter
 from torch_geometric.utils import negative_sampling
 import torch
+from torch_geometric.loader import NeighborLoader
 
 
 class PretrainingNodeDataset(Dataset):
@@ -18,10 +19,21 @@ class PretrainingNodeDataset(Dataset):
 
     def _extract(self):
         data = self.raw_dataset[0].clone()
-        neg_edge_index = negative_sampling(data.edge_index)
-        data.neg_edge_index = neg_edge_index
-        data = graph_exacter(data, self.configs.hops)
-        return data
+        num_neighbors = [10, 10]  # 您可以根据需要调整这些数字
+        loader = NeighborLoader(
+            data,
+            num_neighbors=num_neighbors,
+            batch_size=128,
+            # input_nodes=data.train_mask,
+            shuffle=False,
+        )
+        data_loader = []
+        for data in loader:
+            neg_edge_index = negative_sampling(data.edge_index, num_neg_samples=self.configs.num_neg_samples)
+            data.neg_edge_index = neg_edge_index
+            data = graph_exacter(data, self.configs.hops)
+            data_loader.append(data)
+        return iter(data_loader)
 
     def len(self) -> int:
         return 1
@@ -49,6 +61,7 @@ class InductiveNodeClsDataset(Dataset):
         else:
             mask = data.test_mask
         num_nodes = data.x.shape[0]
+        data.mask = mask
         data.x = data.x[mask]
         data.y = data.y[mask]
         edge_index = data.edge_index.clone()

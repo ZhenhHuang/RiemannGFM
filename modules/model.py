@@ -5,7 +5,7 @@ import torch.nn as nn
 from modules.layers import EuclideanEncoder, ManifoldEncoder
 from modules.basics import HyperbolicStructureLearner, SphericalStructureLearner
 from manifolds import Euclidean, Lorentz, Sphere, ProductSpace
-from torch_scatter import scatter_mean
+from torch_scatter import scatter_mean, scatter_sum
 
 
 class GeoGFM(nn.Module):
@@ -45,7 +45,7 @@ class GeoGFM(nn.Module):
         :return:
         """
         batch_data = data.batch_data[0]
-        node_labels = batch_data.node_labels
+        # node_labels = batch_data.node_labels
         batch = batch_data.batch
         edge_index = data.edge_index
         neg_edge_index = data.neg_edge_index
@@ -55,16 +55,24 @@ class GeoGFM(nn.Module):
         x = torch.cat(x_tuple, dim=-1)
         d_p = self.product.dist(x[edges[0]], x[edges[1]])
 
-        x_rep = x[node_labels]
-        mask_src = (batch[None] == edges[0][:, None])
-        mask_dst = (batch[None] == edges[1][:, None])
-        mask = mask_src.unsqueeze(-2) & mask_dst.unsqueeze(-1)
-        idx, src, dst = torch.where(mask)
-        x_src, x_dst = x_rep[src], x_rep[dst]
-        d_G = scatter_mean(self.product.dist(x_src, x_dst), idx, dim=0)
+        # x_rep = x[node_labels]
+        # e1 = torch.stack(torch.where(batch[None] == edges[0][:, None]), dim=0)
+        # e2 = torch.stack(torch.where(batch[None] == edges[1][:, None]), dim=0)
+        #
+        # e1_src, e1_dst = e1[0], e1[1]
+        # e2_src, e2_dst = e2[0], e2[1]
 
-        eps = self.eps_net(x_src, x_dst)
-        loss = F.relu(rank * (d_p - d_G) + eps).mean()
+        x_rep = x[batch]
+        x_mid = self.product.Frechet_mean(x_rep, dim=0, sum_idx=batch, keepdim=True)
+
+        # x_src = self.product.Frechet_mean(x_rep[e1_dst], dim=0, sum_idx=e1_src, keepdim=True)
+        # x_dst = self.product.Frechet_mean(x_rep[e2_dst], dim=0, sum_idx=e2_src, keepdim=True)
+        #
+        # d_G = torch.mean(self.product.dist(x_src, x_dst))
+        d_G = self.product.dist(x_mid[edges[0]], x_mid[edges[1]])
+
+        eps = self.eps_net(x[edges[0]], x[edges[1]])
+        loss = F.relu(rank * (d_p - d_G + eps * d_p)).mean()
         return loss
 
 
@@ -125,7 +133,7 @@ class EpsNet(nn.Module):
         x, y = self.lin1(x), self.lin1(y)
         z = torch.concat([x, y], dim=-1)
         z = F.relu(self.lin2(self.drop(z)))
-        return z.unsqueeze(-1)
+        return z.squeeze(-1)
 
 
 # if __name__ == '__main__':

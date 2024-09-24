@@ -16,7 +16,7 @@ class HyperbolicStructureLearner(nn.Module):
         self.manifold_S = manifold_S
         self.tree_agg = CrossManifoldAttention(manifold_S, manifold_H, in_dim, hidden_dim, out_dim, dropout)
         self.attention_agg = ManifoldAttention(manifold_H, out_dim, hidden_dim, out_dim, dropout)
-        self.res_lin = nn.Linear(out_dim, out_dim)
+        # self.res_lin = nn.Linear(out_dim, out_dim)
 
     def forward(self, x_H, x_S, batch_tree):
         """
@@ -27,20 +27,25 @@ class HyperbolicStructureLearner(nn.Module):
         """
         node_labels = batch_tree.node_labels
         x = x_H[node_labels]
-        x_res = x.clone()
+        # x_res = x.clone()
         att_index = batch_tree.edge_index
         x = self.tree_agg(x_S[node_labels], x, x, edge_index=att_index)
-        x = self.manifold_H.expmap(x, self.res_lin(x_res))
+        # x = self.manifold_H.expmap(x, self.res_lin(x_res))
 
         x_extend = torch.concat([x, x_H], dim=0)
-        label_extend = torch.cat(
-            [node_labels, torch.arange(x_H.shape[0], device=x_H.device)],
+        # label_extend = torch.cat(
+        #     [node_labels, torch.arange(x_H.shape[0], device=x_H.device)],
+        #     dim=0)
+        # att_index = torch.stack(
+        #     torch.where(label_extend[None] == label_extend[:, None]),
+        #     dim=0)
+        # agg_index = label_extend[att_index]
+        # z_H = self.attention_agg(x_extend, edge_index=att_index, agg_index=agg_index[0])
+        batch = batch_tree.batch
+        batch_extend = torch.cat(
+            [batch, torch.arange(x_H.shape[0], device=x_H.device)],
             dim=0)
-        att_index = torch.stack(
-            torch.where(label_extend[None] == label_extend[:, None]),
-            dim=0)
-        agg_index = label_extend[att_index]
-        z_H = self.attention_agg(x_extend, edge_index=att_index, agg_index=agg_index[0])
+        z_H = self.manifold_H.Frechet_mean(x_extend, keepdim=True, sum_idx=batch_extend)
         return z_H
 
 
@@ -69,19 +74,24 @@ class SphericalStructureLearner(nn.Module):
         batch = batch_data.batch
         x = x_S[node_labels]
         x_res = x.clone()
-        att_index = torch.stack(torch.where(batch[None] == batch[:, None]), dim=0)
+        # att_index = torch.stack(torch.where(batch[None] == batch[:, None]), dim=0)
+        att_index = batch_data.edge_index
         x = self.attention_subset(x_H[node_labels], x, x, edge_index=att_index)
         x = self.manifold_S.expmap(x, self.manifold_S.proju(x, self.res_lin(x_res)))
 
         x_extend = torch.concat([x, x_S], dim=0)
-        label_extend = torch.cat(
-            [node_labels, torch.arange(x_S.shape[0], device=x_S.device)],
+        # label_extend = torch.cat(
+        #     [node_labels, torch.arange(x_S.shape[0], device=x_S.device)],
+        #     dim=0)
+        # att_index = torch.stack(
+        #     torch.where(label_extend[None] == label_extend[:, None]),
+        #     dim=0)
+        # agg_index = label_extend[att_index]
+        # z_S = self.attention_agg(x_extend, edge_index=att_index, agg_index=agg_index[0])
+        batch_extend = torch.cat(
+            [batch, torch.arange(x_S.shape[0], device=x_S.device)],
             dim=0)
-        att_index = torch.stack(
-            torch.where(label_extend[None] == label_extend[:, None]),
-            dim=0)
-        agg_index = label_extend[att_index]
-        z_S = self.attention_agg(x_extend, edge_index=att_index, agg_index=agg_index[0])
+        z_S = self.manifold_S.Frechet_mean(x_extend, keepdim=True, sum_idx=batch_extend)
         return z_S
 
 
@@ -93,6 +103,10 @@ class ManifoldAttention(nn.Module):
         self.k_lin = ConstCurveLinear(manifold, in_dim, hidden_dim, bias=False, dropout=dropout)
         self.v_lin = ConstCurveLinear(manifold, in_dim, hidden_dim, bias=False, dropout=dropout)
         self.proj = ConstCurveLinear(manifold, hidden_dim, out_dim, bias=False, dropout=dropout)
+        self.scalar_map = nn.Sequential(
+            nn.Linear(2 * hidden_dim, 1, bias=False),
+            nn.LeakyReLU()
+        )
 
     def forward(self, x_q, x_k=None, x_v=None, edge_index=None, agg_index=None):
         if x_k is None:
@@ -108,7 +122,8 @@ class ManifoldAttention(nn.Module):
         else:
             src, dst = edge_index[0], edge_index[1]
             agg_index = agg_index if agg_index is not None else src
-            score = -self.manifold.dist2(q[src], k[dst])
+            qk = torch.cat([q[src], k[dst]], dim=-1)
+            score = self.scalar_map(qk).squeeze(-1)
             score = scatter_softmax(score, src, dim=-1)
             out = scatter_sum(score.unsqueeze(1) * v[dst], agg_index, dim=0)
             denorm = self.manifold.inner(None, out, keepdim=True)
@@ -132,16 +147,20 @@ class CrossManifoldAttention(nn.Module):
         self.q_lin = ConstCurveLinear(manifold_q, in_dim, hidden_dim, bias=False, dropout=dropout)
         self.k_lin = ConstCurveLinear(manifold_k, in_dim, hidden_dim, bias=False, dropout=dropout)
         self.v_lin = ConstCurveLinear(manifold_k, in_dim, hidden_dim, bias=False, dropout=dropout)
+        self.scalar_map = nn.Sequential(
+            nn.Linear(2 * hidden_dim, 1, bias=False),
+            nn.LeakyReLU()
+        )
         self.proj = ConstCurveLinear(manifold_k, hidden_dim, out_dim, bias=False, dropout=dropout)
 
     def forward(self, x_q, x_k, x_v, edge_index, agg_index=None):
-        q = self.manifold_q.logmap0(self.q_lin(x_q))
-        q = self.manifold_k.proju0(q)
-        k = self.manifold_k.logmap0(self.k_lin(x_k))
+        q = self.q_lin(x_q)
+        k = self.k_lin(x_k)
         v = self.v_lin(x_v)
         src, dst = edge_index[0], edge_index[1]
         agg_index = agg_index if agg_index is not None else src
-        score = self.manifold_k.inner(None, q[src], k[dst])
+        qk = torch.cat([q[src], k[dst]], dim=-1)
+        score = self.scalar_map(qk).squeeze(-1)
         score = scatter_softmax(score, src, dim=-1)
         out = scatter_sum(score.unsqueeze(1) * v[dst], agg_index, dim=0)
         denorm = self.manifold_k.inner(None, out, keepdim=True)

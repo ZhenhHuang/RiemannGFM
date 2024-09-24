@@ -2,6 +2,7 @@ import geoopt
 import torch
 import geoopt.manifolds.lorentz.math as lmath
 from utils.math_utils import sinh_div, cosh_div_square, sinh_div_cube, arcosh, cosh, sinh
+from torch_scatter import scatter_sum
 
 
 EPS = {torch.float32: 1e-4, torch.float64: 1e-7}
@@ -45,11 +46,13 @@ class Lorentz(geoopt.Lorentz):
         )
         return res
 
-    def Frechet_mean(self, x, weights=None, dim=0, keepdim=False):
+    def Frechet_mean(self, x, weights=None, dim=0, keepdim=False, sum_idx=None):
         if weights is None:
-            z = torch.sum(x, dim=dim, keepdim=True)
+            z = torch.sum(x, dim=dim, keepdim=keepdim) if sum_idx is None \
+                else scatter_sum(x, index=sum_idx, dim=dim)
         else:
-            z = torch.sum(x * weights, dim=dim, keepdim=keepdim)
+            z = torch.sum(x * weights, dim=dim, keepdim=keepdim) if sum_idx is None \
+                else scatter_sum(x * weights, index=sum_idx, dim=dim)
         denorm = self.inner(None, z, keepdim=keepdim)
         denorm = denorm.abs().clamp_min(1e-8).sqrt()
         z = 1. / self.k.sqrt() * z / denorm

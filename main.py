@@ -18,9 +18,9 @@ parser.add_argument('--task', type=str, default='NC',
                     choices=['NC', 'LP', 'GC'])
 parser.add_argument('--dataset', type=str, default='Cora',
                     help=['computers', 'photo', 'KarateClub', 'CS', 'Physics'])
-parser.add_argument('--pretrain_dataset', type=str, default='Cora')
-parser.add_argument('--root_path', type=str, default='./datasets')
-parser.add_argument('--hops', type=int, nargs='+', default=[5, 2], help='Number of hops of sub-graph')
+parser.add_argument('--pretrain_dataset', nargs="+", type=str, default=['ogbn-arxiv'])
+parser.add_argument('--root_path', type=str, default='D:\datasets\Graphs')
+parser.add_argument('--hops', type=int, nargs='+', default=[5, 5], help='Number of hops of sub-graph')
 
 """Checkpoints and logger"""
 parser.add_argument('--checkpoints', type=str, default='./checkpoints/')
@@ -48,9 +48,10 @@ parser.add_argument('--patience', type=int, default=3)
 # Pretraining
 parser.add_argument('--is_load', type=bool, default=False, help='Whether load model from checkpoints')
 parser.add_argument('--pretrain_level', type=str, default="node", help='pretraining task level')
-parser.add_argument('--pretrain_epochs', type=int, default=200)
+parser.add_argument('--pretrain_epochs', type=int, default=20)
 parser.add_argument('--lr', type=float, default=0.001)
 parser.add_argument('--weight_decay', type=float, default=0.0)
+parser.add_argument('--num_neg_samples', type=int, default=1000)
 
 # Node classification
 parser.add_argument('--nc_epochs', type=int, default=120)
@@ -81,17 +82,17 @@ if not os.path.exists(configs.checkpoints):
 if not os.path.exists(configs.log_dir):
     os.mkdir(configs.log_dir)
 if configs.pretrained_model_path is None:
-    configs.pretrained_model_path = f"Pretrain_{configs.dataset}_model.pt"
+    configs.pretrained_model_path = f"Pretrain_{configs.pretrain_dataset}_model.pt"
 if configs.task_model_path is None:
     configs.task_model_path = f"{configs.task}_{configs.dataset}_model.pt"
 if configs.log_name is None:
     configs.log_name = f"{configs.task}_{configs.dataset}.log"
 
-# pretrain_exp = Pretrain(configs)
-# pretrain_exp.train()
+pretrain_exp = Pretrain(configs)
+pretrain_exp.pretrain()
 
 if configs.task == 'NC':
-    exp = NodeClassification(configs, load=False, finetune=False)
+    exp = NodeClassification(configs, load=True, finetune=True)
 elif configs.task == 'LP':
     exp = LinkPrediction(configs)
 else:

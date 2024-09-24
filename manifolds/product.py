@@ -42,6 +42,16 @@ class ProductSpace(geoopt.ProductManifold):
         tensor = self.pack_point(*points)
         return geoopt.ManifoldTensor(tensor, manifold=self)
 
+    def Frechet_mean(self, x, weights=None, dim=0, keepdim=False, sum_idx=None):
+        target_batch_dim = x.dim() - 1
+        mid_tensors = []
+        for i, manifold in enumerate(self.manifolds):
+            point = self.take_submanifold_value(x, i)
+            mid = manifold.Frechet_mean(point, weights, dim, keepdim, sum_idx)
+            mid = mid.reshape((*mid.shape[:target_batch_dim], -1))
+            mid_tensors.append(mid)
+        return torch.cat(mid_tensors, -1)
+
     def jacobian_expmap_v(self, x, v):
         jacobs = torch.zeros((x.shape[0], x.shape[1], x.shape[1])).to(x.device)
         index = 0

@@ -3,6 +3,7 @@ import geoopt
 import torch
 from utils.math_utils import sin_div, cos_div_square, sin_div_cube
 from geoopt.manifolds.stereographic.math import geodesic
+from torch_scatter import scatter_sum
 
 
 EPS = {torch.float32: 1e-4, torch.float64: 1e-7}
@@ -38,11 +39,13 @@ class Sphere(geoopt.Sphere):
     def geodesic(self, t, x, y):
         return geodesic(t, x, y, k=self.k.to(x.device))
 
-    def Frechet_mean(self, x, weights=None, dim=0, keepdim=False):
+    def Frechet_mean(self, x, weights=None, dim=0, keepdim=False, sum_idx=None):
         if weights is None:
-            z = torch.sum(x, dim=dim, keepdim=True)
+            z = torch.sum(x, dim=dim, keepdim=keepdim) if sum_idx is None \
+                else scatter_sum(x, index=sum_idx, dim=dim)
         else:
-            z = torch.sum(x * weights, dim=dim, keepdim=keepdim)
+            z = torch.sum(x * weights, dim=dim, keepdim=keepdim) if sum_idx is None \
+                else scatter_sum(x * weights, index=sum_idx, dim=dim)
         denorm = self.inner(None, z, keepdim=keepdim)
         denorm = denorm.abs().clamp_min(1e-8).sqrt()
         z = 1. / self.k.sqrt() * z / denorm
