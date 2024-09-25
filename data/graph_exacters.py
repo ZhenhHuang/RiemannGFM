@@ -12,14 +12,14 @@ def graph_exacter(data: Data, hops):
     node_labels = []
     data_list = []
     tree_list = []
-    loader = NeighborLoader(data, num_neighbors=hops, batch_size=1, directed=False)
+    loader = NeighborLoader(data, num_neighbors=hops, batch_size=1)
     for node, batch in enumerate(loader):
         subset, sub_edge_index = batch.n_id, batch.edge_index
         subset, idx = torch.sort(subset)
         mapping = torch.where(idx == 0)[0]
         if sub_edge_index.numel() == 0:
             continue
-        _, tree_edge_index = hierarchical_exacter(subset, sub_edge_index, mapping, flow='source_to_target')
+        _, tree_edge_index = hierarchical_exacter(subset, sub_edge_index, mapping, flow='target_to_source')
         node_labels.append(subset)
         data_list.append(Data(edge_index=sub_edge_index, num_nodes=subset.shape[0], seed_node=node))
         tree_list.append(Data(edge_index=tree_edge_index, num_nodes=subset.shape[0], seed_node=node))
@@ -43,14 +43,13 @@ def hierarchical_exacter(subset, edge_index, mapping, flow: str = 'source_to_tar
     :return: alignment_dict, a directed tree graph: (edge_index)
     """
     assert flow in ['source_to_target', 'target_to_source']
-    device = edge_index.device
     if flow == 'target_to_source':
         row, col = edge_index
     else:
         col, row = edge_index
     tree_edges = []
     align_dict = defaultdict(list)
-    visited = subset.new_empty(subset.size(0), dtype=torch.bool).to(device)
+    visited = subset.new_empty(subset.size(0), dtype=torch.bool)
     visited.fill_(False)
     que, h_que = Queue(), Queue()
     que.put(mapping)
@@ -59,7 +58,7 @@ def hierarchical_exacter(subset, edge_index, mapping, flow: str = 'source_to_tar
     while not que.empty():
         if (visited == True).all():
             break
-        node = que.get().to(device)
+        node = que.get()
         h = h_que.get()
         idx = torch.where(node == row)[0]
         source = col[idx]

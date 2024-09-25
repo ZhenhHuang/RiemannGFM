@@ -18,7 +18,7 @@ parser.add_argument('--task', type=str, default='NC',
                     choices=['NC', 'LP', 'GC'])
 parser.add_argument('--dataset', type=str, default='Cora',
                     help=['computers', 'photo', 'KarateClub', 'CS', 'Physics'])
-parser.add_argument('--pretrain_dataset', nargs="+", type=str, default=['ogbn-arxiv'])
+parser.add_argument('--pretrain_dataset', nargs="+", type=str, default=['PubMed'])
 parser.add_argument('--root_path', type=str, default='D:\datasets\Graphs')
 parser.add_argument('--hops', type=int, nargs='+', default=[5, 5], help='Number of hops of sub-graph')
 
@@ -88,11 +88,11 @@ if configs.task_model_path is None:
 if configs.log_name is None:
     configs.log_name = f"{configs.task}_{configs.dataset}.log"
 
-pretrain_exp = Pretrain(configs)
-pretrain_exp.pretrain()
+# pretrain_exp = Pretrain(configs)
+# pretrain_exp.pretrain()
 
 if configs.task == 'NC':
-    exp = NodeClassification(configs, load=True, finetune=True)
+    exp = NodeClassification(configs, load=False, finetune=False)
 elif configs.task == 'LP':
     exp = LinkPrediction(configs)
 else:
