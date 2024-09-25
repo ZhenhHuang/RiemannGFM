@@ -9,8 +9,8 @@ from utils.train_utils import EarlyStopping, act_fn
 from utils.evall_utils import cal_accuracy, cal_AUC_AP
 from utils.logger import create_logger
 from data import *
-from torch_geometric.loader import DataLoader
 import os
+from tqdm import tqdm
 
 
 class SupervisedExp:
@@ -78,43 +78,46 @@ class NodeClassification(SupervisedExp):
         return nc_model
 
     def load_data(self, split: str):
-        if self.configs.nc_mode == 'inductive':
-            dataset = InductiveNodeClsDataset(raw_dataset=load_data(root=self.configs.root_path,
-                                                                    data_name=self.configs.dataset),
-                                              configs=self.configs,
-                                              split=split)
-        else:
-            dataset = TransductiveNodeClsDataset(raw_dataset=load_data(root=self.configs.root_path,
-                                                                    data_name=self.configs.dataset),
-                                              configs=self.configs,
-                                              split=split)
-        dataloader = DataLoader(dataset, batch_size=1)
-        return dataset, dataloader
+        # if self.configs.nc_mode == 'inductive':
+        #     dataset = InductiveNodeClsDataset(raw_dataset=load_data(root=self.configs.root_path,
+        #                                                             data_name=self.configs.dataset),
+        #                                       configs=self.configs,
+        #                                       split=split)
+        # else:
+        #     dataset = TransductiveNodeClsDataset(raw_dataset=load_data(root=self.configs.root_path,
+        #                                                             data_name=self.configs.dataset),
+        #                                       configs=self.configs,
+        #                                       split=split)
+        dataset = load_data(root=self.configs.root_path, data_name=self.configs.dataset)
+        dataloader = ExtractLoader(dataset[0], batch_size=self.configs.batch_size,
+                                   num_neighbors=self.configs.num_neighbors)
+        return dataloader
 
     def train(self):
         self.nc_model.train()
         optimizer = RiemannianAdam(self.nc_model.parameters(), lr=self.configs.lr_nc,
                          weight_decay=self.configs.weight_decay_nc)
-        train_set, train_loader = self.load_data("train")
-        val_set, val_loader = self.load_data("val")
+        dataloader = self.load_data("train")
         early_stop = EarlyStopping(self.configs.patience)
         for epoch in range(self.configs.nc_epochs):
             epoch_loss = []
-            epoch_acc = []
+            total = 0
+            matches = 0
 
-            for data in train_loader:
+            for data in tqdm(dataloader):
                 data = data.to(self.device)
-                loss, acc = self.train_step(data, optimizer)
+                loss, correct, num = self.train_step(data, optimizer)
                 epoch_loss.append(loss)
-                epoch_acc.append(acc)
+                matches += correct
+                total += num
 
             train_loss = np.mean(epoch_loss)
-            train_acc = np.mean(epoch_acc)
+            train_acc = (matches / total).item()
 
             self.logger.info(f"Epoch {epoch}: train_loss={train_loss}, train_acc={train_acc * 100: .2f}%")
 
             if epoch % self.configs.val_every == 0:
-                val_loss, val_acc = self.val(val_loader)
+                val_loss, val_acc = self.val(dataloader)
                 self.logger.info(f"Epoch {epoch}: val_loss={val_loss}, val_acc={val_acc * 100: .2f}%")
                 early_stop(val_loss, self.nc_model, self.configs.checkpoints, self.configs.task_model_path)
                 if early_stop.early_stop:
@@ -126,43 +129,47 @@ class NodeClassification(SupervisedExp):
     def train_step(self, data, optimizer):
         optimizer.zero_grad()
         out = self.nc_model(data)
-        loss, acc = self.cal_loss(out, data.y, data.mask)
+        loss, correct = self.cal_loss(out, data.y, data.train_mask)
         loss.backward()
         optimizer.step()
-        return loss.item(), acc
+        return loss.item(), correct, data.train_mask.sum()
 
     def val(self, val_loader):
         self.nc_model.eval()
         val_loss = []
-        val_acc = []
+        total = 0
+        matches = 0
         with torch.no_grad():
             for data in val_loader:
                 data = data.to(self.device)
                 out = self.nc_model(data)
-                loss, acc = self.cal_loss(out, data.y, data.mask)
+                loss, correct = self.cal_loss(out, data.y, data.val_mask)
                 val_loss.append(loss.item())
-                val_acc.append(acc)
+                matches += correct
+                total += data.val_mask.sum()
         self.nc_model.train()
-        return np.mean(val_loss), np.mean(val_acc)
+        return np.mean(val_loss), (matches / total).item()
 
     def test(self):
-        test_set, test_loader = self.load_data("test")
+        test_loader = self.load_data("test")
         self.nc_model.eval()
-        test_acc = []
+        total = 0
+        matches = 0
         with torch.no_grad():
             for data in test_loader:
                 data = data.to(self.device)
                 out = self.nc_model(data)
-                loss, acc = self.cal_loss(out, data.y, data.mask)
-                test_acc.append(acc)
-        return np.mean(test_acc)
+                loss, correct = self.cal_loss(out, data.y, data.test_mask)
+                matches += correct
+                total += data.test_mask.sum()
+        return (matches / total).item()
 
     def cal_loss(self, output, label, mask):
         out = output if self.configs.nc_mode == 'inductive' else output[mask]
         y = label if self.configs.nc_mode == 'inductive' else label[mask]
         loss = F.cross_entropy(out, y)
-        acc = cal_accuracy(out.detach().cpu().numpy(), y.cpu().numpy())
-        return loss, acc
+        correct = (out.argmax(dim=-1) == y).sum()
+        return loss, correct
 
 
 class LinkPrediction(SupervisedExp):
