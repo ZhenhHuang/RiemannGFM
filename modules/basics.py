@@ -33,19 +33,19 @@ class HyperbolicStructureLearner(nn.Module):
         # x = self.manifold_H.expmap(x, self.res_lin(x_res))
 
         x_extend = torch.concat([x, x_H], dim=0)
-        # label_extend = torch.cat(
-        #     [node_labels, torch.arange(x_H.shape[0], device=x_H.device)],
-        #     dim=0)
+        label_extend = torch.cat(
+            [node_labels, torch.arange(x_H.shape[0], device=x_H.device)],
+            dim=0)
         # att_index = torch.stack(
         #     torch.where(label_extend[None] == label_extend[:, None]),
         #     dim=0)
         # agg_index = label_extend[att_index]
         # z_H = self.attention_agg(x_extend, edge_index=att_index, agg_index=agg_index[0])
-        batch = batch_tree.batch
-        batch_extend = torch.cat(
-            [batch, torch.arange(x_H.shape[0], device=x_H.device)],
-            dim=0)
-        z_H = self.manifold_H.Frechet_mean(x_extend, keepdim=True, sum_idx=batch_extend)
+        # batch = batch_tree.batch
+        # batch_extend = torch.cat(
+        #     [batch, torch.arange(x_H.shape[0], device=x_H.device)],
+        #     dim=0)
+        z_H = self.manifold_H.Frechet_mean(x_extend, keepdim=True, sum_idx=label_extend)
         return z_H
 
 
@@ -80,18 +80,18 @@ class SphericalStructureLearner(nn.Module):
         x = self.manifold_S.expmap(x, self.manifold_S.proju(x, self.res_lin(x_res)))
 
         x_extend = torch.concat([x, x_S], dim=0)
-        # label_extend = torch.cat(
-        #     [node_labels, torch.arange(x_S.shape[0], device=x_S.device)],
-        #     dim=0)
+        label_extend = torch.cat(
+            [node_labels, torch.arange(x_S.shape[0], device=x_S.device)],
+            dim=0)
         # att_index = torch.stack(
         #     torch.where(label_extend[None] == label_extend[:, None]),
         #     dim=0)
         # agg_index = label_extend[att_index]
         # z_S = self.attention_agg(x_extend, edge_index=att_index, agg_index=agg_index[0])
-        batch_extend = torch.cat(
-            [batch, torch.arange(x_S.shape[0], device=x_S.device)],
-            dim=0)
-        z_S = self.manifold_S.Frechet_mean(x_extend, keepdim=True, sum_idx=batch_extend)
+        # batch_extend = torch.cat(
+        #     [batch, torch.arange(x_S.shape[0], device=x_S.device)],
+        #     dim=0)
+        z_S = self.manifold_S.Frechet_mean(x_extend, keepdim=True, sum_idx=label_extend)
         return z_S
 
 

@@ -26,13 +26,13 @@ class Pretrain:
 
     def load_data(self, task_level):
         if task_level == 'node':
-            dataloader = PretrainingNodeDataset(load_data(root=self.configs.root_path,
+            dataset = PretrainingNodeDataset(load_data(root=self.configs.root_path,
                                                        data_name=self.data_name),
                                              self.configs)
             # dataloader = DataLoader(dataset, batch_size=1)
         else:
             raise NotImplementedError
-        return dataloader
+        return dataset.dataloader
 
     def build_model(self):
         model = GeoGFM(n_layers=self.configs.n_layers, in_dim=input_dim_dict[self.data_name],
@@ -44,8 +44,8 @@ class Pretrain:
 
     def _train(self, load=False):
         if load:
-            self.logger.info(f"---------------Loading pretrained models from {path}-------------")
             path = os.path.join(self.configs.checkpoints, self.configs.pretrained_model_path)
+            self.logger.info(f"---------------Loading pretrained models from {path}-------------")
             pretrained_dict = torch.load(path)
             model_dict = self.model.state_dict()
             pretrained_dict = {k: v for k, v in pretrained_dict.items() if 'init_block' not in k}
@@ -56,7 +56,8 @@ class Pretrain:
         optimizer = Adam(self.model.parameters(), lr=self.configs.lr, weight_decay=self.configs.weight_decay)
         for epoch in range(self.configs.pretrain_epochs):
             epoch_loss = []
-            for data in dataloader:
+            for data in tqdm(dataloader):
+                # data = handle_subgraph(data, self.configs.num_neg_samples, self.configs.hops)
                 data = data.to(self.device)
                 optimizer.zero_grad()
                 output = self.model(data)
