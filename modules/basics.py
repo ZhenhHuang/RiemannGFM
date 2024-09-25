@@ -162,7 +162,7 @@ class CrossManifoldAttention(nn.Module):
         score = self.scalar_map(qk).squeeze(-1)
         score = scatter_softmax(score, src, dim=-1)
 
-        out = scatter_sum(score.unsqueeze(1) * v[dst], agg_index, dim=0)
+        out = scatter_sum(score.unsqueeze(1) * v[dst], agg_index, dim=0, out=self.manifold_k.origin(q.shape, device=q.device))
 
         denorm = self.manifold_k.inner(None, out, keepdim=True)
         denorm = denorm.abs().clamp_min(1e-8).sqrt()

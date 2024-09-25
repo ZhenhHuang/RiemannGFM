@@ -12,7 +12,7 @@ class ExtractLoader(NeighborLoader):
                  input_nodes=None,
                  input_time=None,
                  replace: bool = False,
-                 directed: bool = False,
+                 directed: bool = True,
                  disjoint: bool = False,
                  temporal_strategy: str = 'uniform',
                  time_attr: Optional[str] = None,
