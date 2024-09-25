@@ -28,7 +28,7 @@ class GeoGFM(nn.Module):
     def forward(self, data):
         """
 
-        :param data: Dataset for a graph contains batched sub-graphs and sub-trees.
+        :param data: Dataset for a graph contains batched sub-trees.
         :return: z: node product representations
         """
         x = data.x.clone()
@@ -44,35 +44,42 @@ class GeoGFM(nn.Module):
         :param data:
         :return:
         """
-        batch_data = data.batch_data[0]
-        # node_labels = batch_data.node_labels
-        batch = batch_data.batch
-        edge_index = data.edge_index
-        neg_edge_index = data.neg_edge_index
-        edges = torch.cat([edge_index, neg_edge_index], dim=-1)
-        rank = torch.tensor([1.] * edge_index.shape[-1] + [-1.] * neg_edge_index.shape[-1]).to(edges.device)
-
-        x = torch.cat(x_tuple, dim=-1)
-        d_p = self.product.dist(x[edges[0]], x[edges[1]])
-
-        # x_rep = x[node_labels]
-        # e1 = torch.stack(torch.where(batch[None] == edges[0][:, None]), dim=0)
-        # e2 = torch.stack(torch.where(batch[None] == edges[1][:, None]), dim=0)
+        # edge_index = data.edge_index
+        # neg_edge_index = data.neg_edge_index
         #
-        # e1_src, e1_dst = e1[0], e1[1]
-        # e2_src, e2_dst = e2[0], e2[1]
-
-        x_rep = x[batch]
-        x_mid = self.product.Frechet_mean(x_rep, dim=0, sum_idx=batch, keepdim=True)
-
-        # x_src = self.product.Frechet_mean(x_rep[e1_dst], dim=0, sum_idx=e1_src, keepdim=True)
-        # x_dst = self.product.Frechet_mean(x_rep[e2_dst], dim=0, sum_idx=e2_src, keepdim=True)
+        # edges = torch.cat([edge_index, neg_edge_index], dim=-1)
+        # rank = torch.tensor([1.] * edge_index.shape[-1] + [-1.] * neg_edge_index.shape[-1]).to(edges.device)
         #
-        # d_G = torch.mean(self.product.dist(x_src, x_dst))
-        d_G = self.product.dist(x_mid[edges[0]], x_mid[edges[1]])
+        # x = torch.cat(x_tuple, dim=-1)
+        # d_p = self.product.dist(x[edges[0]], x[edges[1]])
+        #
+        # src, dst = edge_index[0], edge_index[1]
+        # x_mid = self.product.Frechet_mean(x[src], dim=0, sum_idx=dst, keepdim=True)
+        # d_G = self.product.dist(x_mid[edges[0]], x_mid[edges[1]])
+        #
+        # eps = self.eps_net(x[edges[0]], x[edges[1]])
+        # loss = F.relu(rank * (d_p - d_G + eps * d_p)).mean()
 
-        eps = self.eps_net(x[edges[0]], x[edges[1]])
-        loss = F.relu(rank * (d_p - d_G + eps * d_p)).mean()
+        E, H, S = x_tuple
+        x1 = torch.cat([E, H], dim=-1)[:data.batch_size]
+        x2 = torch.cat([E, S], dim=-1)[:data.batch_size]
+        loss = self.cal_cl_loss(x1, x2)
+
+        return loss
+
+    def cal_cl_loss(self, x1, x2):
+        EPS = 1e-6
+        norm1 = x1.norm(dim=-1)
+        norm2 = x2.norm(dim=-1)
+        sim_matrix = torch.einsum('ik,jk->ij', x1, x2) / (torch.einsum('i,j->ij', norm1, norm2) + EPS)
+        sim_matrix = torch.exp(sim_matrix / 0.2)
+        pos_sim = sim_matrix.diag()
+        loss_1 = pos_sim / (sim_matrix.sum(dim=-2) - pos_sim + EPS)
+        loss_2 = pos_sim / (sim_matrix.sum(dim=-1) - pos_sim + EPS)
+
+        loss_1 = -torch.log(loss_1).mean()
+        loss_2 = -torch.log(loss_2).mean()
+        loss = (loss_1 + loss_2) / 2.
         return loss
 
 
@@ -111,8 +118,8 @@ class StructuralBlock(nn.Module):
         :return: x_tuple: (x_H, x_S)
         """
         x_H, x_S = x_tuple
-        x_H = self.Hyp_learner(x_H, x_S, data.batch_tree[0])
-        x_S = self.Sph_learner(x_H, x_S, data.batch_data[0])
+        x_H = self.Hyp_learner(x_H, x_S, data.batch_tree)
+        x_S = self.Sph_learner(x_H, x_S, data)
         return x_H, x_S
 
 

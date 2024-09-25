@@ -25,7 +25,8 @@ class HyperbolicStructureLearner(nn.Module):
         :param batch_tree: a batch graph with tree-graphs from one graph.
         :return: New Hyperbolic representation of nodes.
         """
-        node_labels = batch_tree.node_labels
+        num_seeds = len(batch_tree)
+        node_labels = torch.arange(x_H.shape[0], device=x_H.device).repeat(num_seeds)
         x = x_H[node_labels]
         # x_res = x.clone()
         att_index = batch_tree.edge_index
@@ -62,27 +63,24 @@ class SphericalStructureLearner(nn.Module):
         # self.attention_agg = ManifoldAttention(manifold_S, out_dim, hidden_dim, out_dim, dropout)
         self.res_lin = nn.Linear(out_dim, out_dim)
 
-    def forward(self, x_H, x_S, batch_data):
+    def forward(self, x_H, x_S, data):
         """
 
         :param x_H: Hyperbolic representation of nodes
         :param x_S: Sphere representation of nodes
-        :param batch_data: a batch graph with sub-graphs from one graph.
+        :param data: a graph or mini-batched graph
         :return: New sphere representation of nodes.
         """
-        node_labels = batch_data.node_labels
-        batch = batch_data.batch
-        x = x_S[node_labels]
-        x_res = x.clone()
+        # x_res = x_S.clone()
         # att_index = torch.stack(torch.where(batch[None] == batch[:, None]), dim=0)
-        att_index = batch_data.edge_index
-        x = self.attention_subset(x_H[node_labels], x, x, edge_index=att_index)
-        x = self.manifold_S.expmap(x, self.manifold_S.proju(x, self.res_lin(x_res)))
+        att_index = data.edge_index
+        x = self.attention_subset(x_H, x_S, x_S, edge_index=att_index)
+        z_S = self.manifold_S.expmap(x, self.manifold_S.proju(x, self.res_lin(x_S)))
 
-        x_extend = torch.concat([x, x_S], dim=0)
-        label_extend = torch.cat(
-            [node_labels, torch.arange(x_S.shape[0], device=x_S.device)],
-            dim=0)
+        # x_extend = torch.concat([x, x_S], dim=0)
+        # label_extend = torch.cat(
+        #     [node_labels, torch.arange(x_S.shape[0], device=x_S.device)],
+        #     dim=0)
         # att_index = torch.stack(
         #     torch.where(label_extend[None] == label_extend[:, None]),
         #     dim=0)
@@ -91,7 +89,7 @@ class SphericalStructureLearner(nn.Module):
         # batch_extend = torch.cat(
         #     [batch, torch.arange(x_S.shape[0], device=x_S.device)],
         #     dim=0)
-        z_S = self.manifold_S.Frechet_mean(x_extend, keepdim=True, sum_idx=label_extend)
+        # z_S = self.manifold_S.Frechet_mean(x_extend, keepdim=True, sum_idx=label_extend)
         return z_S
 
 
@@ -159,10 +157,13 @@ class CrossManifoldAttention(nn.Module):
         v = self.v_lin(x_v)
         src, dst = edge_index[0], edge_index[1]
         agg_index = agg_index if agg_index is not None else src
+
         qk = torch.cat([q[src], k[dst]], dim=-1)
         score = self.scalar_map(qk).squeeze(-1)
         score = scatter_softmax(score, src, dim=-1)
+
         out = scatter_sum(score.unsqueeze(1) * v[dst], agg_index, dim=0)
+
         denorm = self.manifold_k.inner(None, out, keepdim=True)
         denorm = denorm.abs().clamp_min(1e-8).sqrt()
         out = 1. / self.manifold_k.k.sqrt() * out / denorm

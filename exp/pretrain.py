@@ -7,9 +7,9 @@ from modules import *
 from utils.train_utils import EarlyStopping, act_fn
 from utils.evall_utils import cal_accuracy, cal_AUC_AP
 from utils.logger import create_logger
-from data import load_data, PretrainingNodeDataset, input_dim_dict
-from torch_geometric.loader import DataLoader
+from data import load_data, input_dim_dict, ExtractLoader
 import os
+from tqdm import tqdm
 
 
 class Pretrain:
@@ -26,13 +26,12 @@ class Pretrain:
 
     def load_data(self, task_level):
         if task_level == 'node':
-            dataset = PretrainingNodeDataset(load_data(root=self.configs.root_path,
-                                                       data_name=self.data_name),
-                                             self.configs)
-            # dataloader = DataLoader(dataset, batch_size=1)
+            dataset = load_data(root=self.configs.root_path, data_name=self.data_name)
+            dataloader = ExtractLoader(dataset[0], batch_size=self.configs.batch_size,
+                                       num_neighbors=self.configs.num_neighbors)
         else:
             raise NotImplementedError
-        return dataset.dataloader
+        return dataloader
 
     def build_model(self):
         model = GeoGFM(n_layers=self.configs.n_layers, in_dim=input_dim_dict[self.data_name],
@@ -57,9 +56,8 @@ class Pretrain:
         for epoch in range(self.configs.pretrain_epochs):
             epoch_loss = []
             for data in tqdm(dataloader):
-                # data = handle_subgraph(data, self.configs.num_neg_samples, self.configs.hops)
-                data = data.to(self.device)
                 optimizer.zero_grad()
+                data = data.to(self.device)
                 output = self.model(data)
                 loss = self.model.loss(output, data)
                 loss.backward()
