@@ -42,15 +42,15 @@ class Pretrain:
         self.model = model
 
     def _train(self, load=False):
+        path = os.path.join(self.configs.checkpoints, self.configs.pretrained_model_path)
         if load:
-            path = os.path.join(self.configs.checkpoints, self.configs.pretrained_model_path)
             self.logger.info(f"---------------Loading pretrained models from {path}-------------")
             pretrained_dict = torch.load(path)
             model_dict = self.model.state_dict()
             pretrained_dict = {k: v for k, v in pretrained_dict.items() if 'init_block' not in k}
             model_dict.update(pretrained_dict)
             self.model.load_state_dict(model_dict)
-        early_stop = EarlyStopping(self.configs.patience)
+        # early_stop = EarlyStopping(self.configs.patience)
         dataloader = self.load_data(self.configs.pretrain_level)
         optimizer = Adam(self.model.parameters(), lr=self.configs.lr, weight_decay=self.configs.weight_decay)
         for epoch in range(self.configs.pretrain_epochs):
@@ -65,10 +65,12 @@ class Pretrain:
                 epoch_loss.append(loss.item())
             train_loss = np.mean(epoch_loss)
             self.logger.info(f"Epoch {epoch}: train_loss={train_loss}")
-            early_stop(train_loss, self.model, self.configs.checkpoints, self.configs.pretrained_model_path)
-            if early_stop.early_stop:
-                print("---------Early stopping--------")
-                break
+            self.logger.info(f"---------------Saving pretrained models to {path}-------------")
+            torch.save(self.model.state_dict(), path)
+            # early_stop(train_loss, self.model, self.configs.checkpoints, self.configs.pretrained_model_path)
+            # if early_stop.early_stop:
+            #     print("---------Early stopping--------")
+            #     break
 
     def pretrain(self):
         if not isinstance(self.configs.pretrain_dataset, list):
