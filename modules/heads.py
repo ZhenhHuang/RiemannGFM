@@ -2,6 +2,7 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 import torch.nn as nn
+from torch_geometric.nn.conv import GCNConv
 
 
 class NodeClsHead(nn.Module):
@@ -13,7 +14,7 @@ class NodeClsHead(nn.Module):
         """
         super(NodeClsHead, self).__init__()
         self.pretrained_model = pretrained_model
-        self.head = nn.Linear(in_dim, num_cls)
+        self.head = GCNConv(in_dim, num_cls, bias=False)
     
     def forward(self, data):
         """
@@ -27,7 +28,7 @@ class NodeClsHead(nn.Module):
         x_h = manifold_H.logmap0(x_H)
         x_s = manifold_S.logmap0(x_S)
         x = torch.concat([x_E, x_h, x_s], dim=-1)
-        return self.head(x)
+        return self.head(x, data.edge_index)
 
 
 class GraphClsHead(nn.Module):

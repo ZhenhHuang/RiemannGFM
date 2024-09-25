@@ -32,7 +32,7 @@ class GeoGFM(nn.Module):
         :return: z: node product representations
         """
         x = data.x.clone()
-        x_E, x_H, x_S = self.init_block(x)  # [N, Hidden]
+        x_E, x_H, x_S = self.init_block(x, data.edge_index)  # [N, Hidden]
         for i, block in enumerate(self.blocks):
             x_H, x_S = block((x_H, x_S), data)
         return x_E, x_H, x_S
@@ -90,13 +90,13 @@ class InitBlock(nn.Module):
         self.Hyp_init = ManifoldEncoder(manifold_H, out_dim, hidden_dim, out_dim, bias, None, 0.)
         self.Sph_init = ManifoldEncoder(manifold_S, out_dim, hidden_dim, out_dim, bias, None, 0.)
 
-    def forward(self, x):
+    def forward(self, x, edge_index):
         """
 
         :param x: raw features
         :return: (E, H, S) Manifold initial representations
         """
-        E = self.Euc_init(x)
+        E = self.Euc_init(x, edge_index)
         H = self.Hyp_init(E)
         S = self.Sph_init(E)
         return E, H, S
