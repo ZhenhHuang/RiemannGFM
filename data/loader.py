@@ -22,7 +22,7 @@ class ExtractLoader(NeighborLoader):
                  is_sorted: bool = False,
                  filter_per_worker: bool = False,
                  neighbor_sampler=None,
-                 num_neg_samples: int = None, **kwargs):
+                 num_neg_samples: int = None, capacity: int = 1000, **kwargs):
         super(ExtractLoader, self).__init__(
             data, num_neighbors, input_nodes, input_time, replace, directed,
             disjoint, temporal_strategy, time_attr, transform,
@@ -30,7 +30,7 @@ class ExtractLoader(NeighborLoader):
             **kwargs
         )
         self.num_neg_samples = num_neg_samples
-        self.cache = LRUCache(capacity=500)
+        self.cache = LRUCache(capacity=capacity)
 
     def __iter__(self):
         for key, data in enumerate(super().__iter__()):
