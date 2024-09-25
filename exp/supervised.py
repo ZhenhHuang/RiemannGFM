@@ -153,6 +153,10 @@ class NodeClassification(SupervisedExp):
     def test(self):
         test_loader = self.load_data("test")
         self.nc_model.eval()
+        self.logger.info("--------------Testing--------------------")
+        path = os.path.join(self.configs.checkpoints, self.configs.task_model_path)
+        self.logger.info(f"--------------Loading from {path}--------------------")
+        self.nc_model.load_state_dict(torch.load(path))
         total = 0
         matches = 0
         with torch.no_grad():
@@ -162,7 +166,9 @@ class NodeClassification(SupervisedExp):
                 loss, correct = self.cal_loss(out, data.y, data.test_mask)
                 matches += correct
                 total += data.test_mask.sum()
-        return (matches / total).item()
+        test_acc = (matches / total).item()
+        self.logger.info(f"test_acc={test_acc * 100: .2f}%")
+        return test_acc
 
     def cal_loss(self, output, label, mask):
         out = output if self.configs.nc_mode == 'inductive' else output[mask]
