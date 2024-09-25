@@ -44,7 +44,7 @@ class GeoGFM(nn.Module):
         :param data:
         :return:
         """
-        batch_data = data.batch_data[0]
+        batch_data = data.batch_data
         # node_labels = batch_data.node_labels
         batch = batch_data.batch
         edge_index = data.edge_index
@@ -111,8 +111,8 @@ class StructuralBlock(nn.Module):
         :return: x_tuple: (x_H, x_S)
         """
         x_H, x_S = x_tuple
-        x_H = self.Hyp_learner(x_H, x_S, data.batch_tree[0])
-        x_S = self.Sph_learner(x_H, x_S, data.batch_data[0])
+        x_H = self.Hyp_learner(x_H, x_S, data.batch_tree)
+        x_S = self.Sph_learner(x_H, x_S, data.batch_data)
         return x_H, x_S
 
 

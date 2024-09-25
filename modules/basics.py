@@ -15,7 +15,7 @@ class HyperbolicStructureLearner(nn.Module):
         self.manifold_H = manifold_H
         self.manifold_S = manifold_S
         self.tree_agg = CrossManifoldAttention(manifold_S, manifold_H, in_dim, hidden_dim, out_dim, dropout)
-        self.attention_agg = ManifoldAttention(manifold_H, out_dim, hidden_dim, out_dim, dropout)
+        # self.attention_agg = ManifoldAttention(manifold_H, out_dim, hidden_dim, out_dim, dropout)
         # self.res_lin = nn.Linear(out_dim, out_dim)
 
     def forward(self, x_H, x_S, batch_tree):
@@ -59,7 +59,7 @@ class SphericalStructureLearner(nn.Module):
         self.manifold_H = manifold_H
         self.manifold_S = manifold_S
         self.attention_subset = CrossManifoldAttention(manifold_H, manifold_S, in_dim, hidden_dim, out_dim, dropout)
-        self.attention_agg = ManifoldAttention(manifold_S, out_dim, hidden_dim, out_dim, dropout)
+        # self.attention_agg = ManifoldAttention(manifold_S, out_dim, hidden_dim, out_dim, dropout)
         self.res_lin = nn.Linear(out_dim, out_dim)
 
     def forward(self, x_H, x_S, batch_data):
