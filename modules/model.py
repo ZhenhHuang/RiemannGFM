@@ -22,7 +22,9 @@ class GeoGFM(nn.Module):
         for i in range(n_layers):
             self.blocks.append(StructuralBlock(self.manifold_H, self.manifold_S,
                                                embed_dim, hidden_dim, embed_dim, dropout))
-        self.proj = nn.Linear(3 * embed_dim, embed_dim)
+        self.proj = nn.Sequential(nn.Linear(2 * embed_dim, hidden_dim),
+                                  nn.ReLU(),
+                                  nn.Linear(hidden_dim, embed_dim))
 
     def forward(self, data):
         """
@@ -33,14 +35,7 @@ class GeoGFM(nn.Module):
         x = data.x.clone()
         x_E, x_H, x_S = self.init_block(x, data.edge_index)  # [N, Hidden]
         for i, block in enumerate(self.blocks):
-            x_H, x_S = block((x_H, x_S), data)
-        H_E = self.manifold_H.proju(x_H, x_E)
-        S_E = self.manifold_H.proju(x_S, x_E)
-
-        H_E = self.manifold_H.transp0back(x_H, H_E)
-        S_E = self.manifold_S.transp(x_S, self.manifold_S.origin(x_S.shape, device=x_S.device), S_E)
-        E = torch.cat([x_E, H_E, S_E], dim=-1)
-        x_E = self.proj(E)
+            x_E, x_H, x_S = block((x_E, x_H, x_S), data)
         return x_E, x_H, x_S
 
     def loss(self, x_tuple, data):
@@ -52,13 +47,21 @@ class GeoGFM(nn.Module):
         """
 
         E, H, S = x_tuple
-        E = E[:data.batch_size]
-        H = H[:data.batch_size]
-        S = S[:data.batch_size]
+        x_E = E[:data.batch_size]
+        x_H = H[:data.batch_size]
+        x_S = S[:data.batch_size]
 
-        H_E = self.manifold_H.logmap0(H)
-        S_E = self.manifold_S.logmap0(S)
-        loss = self.cal_cl_loss(E, H_E) + self.cal_cl_loss(E, S_E)
+        H_E = self.manifold_H.proju(x_H, x_E)
+        S_E = self.manifold_H.proju(x_S, x_E)
+
+        H_E = self.manifold_H.transp0back(x_H, H_E)
+        S_E = self.manifold_S.transp(x_S, self.manifold_S.origin(x_S.shape, device=x_S.device), S_E)
+
+        log0_H = self.manifold_H.logmap0(x_H)
+        log0_S = self.manifold_S.logmap0(x_S)
+        H_E = self.proj(torch.cat([log0_H, H_E], dim=-1))
+        S_E = self.proj(torch.cat([log0_S, S_E], dim=-1))
+        loss = self.cal_cl_loss(H_E, S_E)
 
         return loss
 
@@ -107,18 +110,30 @@ class StructuralBlock(nn.Module):
         self.manifold_S = manifold_S
         self.Hyp_learner = HyperbolicStructureLearner(self.manifold_H, self.manifold_S, in_dim, hidden_dim, out_dim, dropout)
         self.Sph_learner = SphericalStructureLearner(self.manifold_H, self.manifold_S, in_dim, hidden_dim, out_dim, dropout)
+        self.proj = self.proj = nn.Sequential(nn.Linear(3 * out_dim, hidden_dim),
+                                  nn.ReLU(),
+                                  nn.Linear(hidden_dim, out_dim))
 
     def forward(self, x_tuple, data):
         """
 
-        :param x_tuple: (x_H, x_S)
+        :param x_tuple: (x_E, x_H, x_S)
         :param data: Dataset for a graph contains batched sub-graphs and sub-trees
         :return: x_tuple: (x_H, x_S)
         """
-        x_H, x_S = x_tuple
+        x_E, x_H, x_S = x_tuple
         x_H = self.Hyp_learner(x_H, x_S, data.batch_tree)
         x_S = self.Sph_learner(x_H, x_S, data)
-        return x_H, x_S
+
+        H_E = self.manifold_H.proju(x_H, x_E)
+        S_E = self.manifold_H.proju(x_S, x_E)
+
+        H_E = self.manifold_H.transp0back(x_H, H_E)
+        S_E = self.manifold_S.transp(x_S, self.manifold_S.origin(x_S.shape, device=x_S.device), S_E)
+
+        E = torch.cat([x_E, H_E, S_E], dim=-1)
+        x_E = self.proj(E)
+        return x_E, x_H, x_S
 
 
 class EpsNet(nn.Module):

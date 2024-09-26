@@ -33,7 +33,7 @@ class SupervisedExp:
 
                 pretrained_dict = torch.load(path)
                 model_dict = pretrained_model.state_dict()
-                pretrained_dict = {k: v for k, v in pretrained_dict.items() if 'Euc_init' not in k}
+                pretrained_dict = {k: v for k, v in pretrained_dict.items() if 'init_block' not in k}
                 model_dict.update(pretrained_dict)
                 pretrained_model.load_state_dict(model_dict)
 
@@ -60,7 +60,7 @@ class SupervisedExp:
     def val(self, val_loader):
         pass
 
-    def test(self):
+    def test(self, test_loader):
         pass
 
     def cal_loss(self, **kwargs):
@@ -124,7 +124,7 @@ class NodeClassification(SupervisedExp):
                 if early_stop.early_stop:
                     print("---------Early stopping--------")
                     break
-        test_acc = self.test()
+        test_acc = self.test(dataloader)
         self.logger.info(f"test_acc={test_acc * 100: .2f}%")
 
     def train_step(self, data, optimizer):
@@ -151,8 +151,8 @@ class NodeClassification(SupervisedExp):
         self.nc_model.train()
         return np.mean(val_loss), (matches / total).item()
 
-    def test(self):
-        test_loader = self.load_data("test")
+    def test(self, test_loader=None):
+        test_loader = self.load_data("test") if test_loader is None else test_loader
         self.nc_model.eval()
         self.logger.info("--------------Testing--------------------")
         path = os.path.join(self.configs.checkpoints, self.configs.task_model_path)
