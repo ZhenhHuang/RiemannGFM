@@ -28,7 +28,7 @@ class SupervisedExp:
                                       bias=self.configs.bias,
                                       dropout=self.configs.dropout, activation=act_fn(self.configs.activation))
             if load:
-                path = os.path.join(self.configs.checkpoints, self.configs.pretrained_model_path)
+                path = os.path.join(self.configs.checkpoints, self.configs.pretrained_model_path) + f"_{self.configs.id}.pt"
                 self.logger.info(f"---------------Loading pretrained models from {path}-------------")
 
                 pretrained_dict = torch.load(path)

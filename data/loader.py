@@ -2,7 +2,7 @@ import torch
 from torch_geometric.data import Data, Batch
 from torch_geometric.loader import NeighborLoader
 from typing import Union, List, Optional, Callable
-from torch_geometric.utils import negative_sampling
+from torch_geometric.utils import negative_sampling, add_self_loops
 from data.graph_exacters import hierarchical_exacter
 from collections import OrderedDict
 
@@ -34,6 +34,7 @@ class ExtractLoader(NeighborLoader):
 
     def __iter__(self):
         for key, data in enumerate(super().__iter__()):
+            data.edge_index = add_self_loops(data.edge_index, num_nodes=data.num_nodes)[0]
             if key in self.cache:
                 data = self.cache.get(key)
             else:

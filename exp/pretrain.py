@@ -66,8 +66,8 @@ class Pretrain:
                 epoch_loss.append(loss.item())
             train_loss = np.mean(epoch_loss)
             self.logger.info(f"Epoch {epoch}: train_loss={train_loss}")
-            self.logger.info(f"---------------Saving pretrained models to {path}-------------")
-            torch.save(self.model.state_dict(), path)
+            self.logger.info(f"---------------Saving pretrained models to {path}_{epoch}.pt-------------")
+            torch.save(self.model.state_dict(), path + f"_{epoch}.pt")
             # early_stop(train_loss, self.model, self.configs.checkpoints, self.configs.pretrained_model_path)
             # if early_stop.early_stop:
             #     print("---------Early stopping--------")

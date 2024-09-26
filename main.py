@@ -20,7 +20,7 @@ parser.add_argument('--dataset', type=str, default='Cora',
                     help=['computers', 'photo', 'KarateClub', 'CS', 'Physics'])
 parser.add_argument('--pretrain_dataset', nargs="+", type=str, default=['ogbn-arxiv'])
 parser.add_argument('--root_path', type=str, default='D:\datasets\Graphs')
-parser.add_argument('--num_neighbors', type=int, nargs="+", default=[10, 10], help="Number of neighbors of data_loaders")
+parser.add_argument('--num_neighbors', type=int, nargs="+", default=[20, 20], help="Number of neighbors of data_loaders")
 parser.add_argument('--batch_size', type=int, default=32)
 parser.add_argument('--capacity', type=int, default=1000, help="Capacity of Cache for dataloader")
 
@@ -46,6 +46,7 @@ parser.add_argument('--embed_dim_lp', type=int, default=32)
 """Training settings"""
 parser.add_argument('--val_every', type=int, default=5)
 parser.add_argument('--patience', type=int, default=3)
+parser.add_argument('--id', type=int, default=0)
 
 # Pretraining
 parser.add_argument('--is_load', type=bool, default=False, help='Whether load model from checkpoints')
@@ -84,14 +85,14 @@ if not os.path.exists(configs.checkpoints):
 if not os.path.exists(configs.log_dir):
     os.mkdir(configs.log_dir)
 if configs.pretrained_model_path is None:
-    configs.pretrained_model_path = f"Pretrain_{configs.pretrain_dataset}_model.pt"
+    configs.pretrained_model_path = f"Pretrain_{configs.pretrain_dataset}_model"
 if configs.task_model_path is None:
     configs.task_model_path = f"{configs.task}_{configs.dataset}_model.pt"
 if configs.log_name is None:
     configs.log_name = f"{configs.task}_{configs.dataset}.log"
 
-# pretrain_exp = Pretrain(configs)
-# pretrain_exp.pretrain()
+pretrain_exp = Pretrain(configs)
+pretrain_exp.pretrain()
 
 if configs.task == 'NC':
     exp = NodeClassification(configs, load=True, finetune=True)
