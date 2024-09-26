@@ -18,9 +18,11 @@ parser.add_argument('--task', type=str, default='NC',
                     choices=['NC', 'LP', 'GC'])
 parser.add_argument('--dataset', type=str, default='Cora',
                     help=['computers', 'photo', 'KarateClub', 'CS', 'Physics'])
-parser.add_argument('--pretrain_dataset', nargs="+", type=str, default=['PubMed'])
+parser.add_argument('--pretrain_dataset', nargs="+", type=str, default=['ogbn-arxiv'])
 parser.add_argument('--root_path', type=str, default='D:\datasets\Graphs')
-parser.add_argument('--hops', type=int, nargs='+', default=[5, 5], help='Number of hops of sub-graph')
+parser.add_argument('--num_neighbors', type=int, nargs="+", default=[10, 10], help="Number of neighbors of data_loaders")
+parser.add_argument('--batch_size', type=int, default=32)
+parser.add_argument('--capacity', type=int, default=1000, help="Capacity of Cache for dataloader")
 
 """Checkpoints and logger"""
 parser.add_argument('--checkpoints', type=str, default='./checkpoints/')
@@ -56,7 +58,7 @@ parser.add_argument('--num_neg_samples', type=int, default=1000)
 # Node classification
 parser.add_argument('--nc_epochs', type=int, default=120)
 parser.add_argument('--lr_nc', type=float, default=0.001)
-parser.add_argument('--weight_decay_nc', type=float, default=0.0005)
+parser.add_argument('--weight_decay_nc', type=float, default=0.0000)
 parser.add_argument('--nc_mode', type=str, default="transductive",
                     choices=["transductive", "inductive"])
 
@@ -92,11 +94,12 @@ if configs.log_name is None:
 # pretrain_exp.pretrain()
 
 if configs.task == 'NC':
-    exp = NodeClassification(configs, load=False, finetune=False)
+    exp = NodeClassification(configs, load=True, finetune=True)
 elif configs.task == 'LP':
     exp = LinkPrediction(configs)
 else:
     raise NotImplementedError
 exp.train()
+# exp.test()
 
 torch.cuda.empty_cache()
