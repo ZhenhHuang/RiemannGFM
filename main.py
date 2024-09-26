@@ -16,11 +16,11 @@ parser = argparse.ArgumentParser(description='Geometric Graph Foundation Model')
 """Dataset settings"""
 parser.add_argument('--task', type=str, default='NC',
                     choices=['NC', 'LP', 'GC'])
-parser.add_argument('--dataset', type=str, default='Cora',
+parser.add_argument('--dataset', type=str, default='CS',
                     help="['computers', 'photo', 'KarateClub', 'CS', 'Physics']")
-parser.add_argument('--pretrain_dataset', nargs="+", type=str, default=['PubMed'], help="[ogbn-arxiv, PubMed]")
+parser.add_argument('--pretrain_dataset', nargs="+", type=str, default=['ogbn-arxiv'], help="[ogbn-arxiv, PubMed]")
 parser.add_argument('--root_path', type=str, default='D:\datasets\Graphs')
-parser.add_argument('--num_neighbors', type=int, nargs="+", default=[20, 20], help="Number of neighbors of data_loaders")
+parser.add_argument('--num_neighbors', type=int, nargs="+", default=[20, 10], help="Number of neighbors of data_loaders")
 parser.add_argument('--batch_size', type=int, default=32)
 parser.add_argument('--capacity', type=int, default=1000, help="Capacity of Cache for dataloader")
 
@@ -46,7 +46,7 @@ parser.add_argument('--embed_dim_lp', type=int, default=32)
 """Training settings"""
 parser.add_argument('--val_every', type=int, default=1)
 parser.add_argument('--patience', type=int, default=3)
-parser.add_argument('--id', type=int, default=8)
+parser.add_argument('--id', type=int, default=0)
 
 # Pretraining
 parser.add_argument('--is_load', type=bool, default=False, help='Whether load model from checkpoints')
@@ -58,7 +58,7 @@ parser.add_argument('--num_neg_samples', type=int, default=1000)
 
 # Node classification
 parser.add_argument('--nc_epochs', type=int, default=120)
-parser.add_argument('--lr_nc', type=float, default=0.01)
+parser.add_argument('--lr_nc', type=float, default=0.001)
 parser.add_argument('--weight_decay_nc', type=float, default=0.0000)
 parser.add_argument('--nc_mode', type=str, default="transductive",
                     choices=["transductive", "inductive"])
@@ -97,7 +97,7 @@ print(configs)
 # pretrain_exp.pretrain()
 
 if configs.task == 'NC':
-    exp = NodeClassification(configs, load=True, finetune=True)
+    exp = NodeClassification(configs, load=False, finetune=False)
 elif configs.task == 'LP':
     exp = LinkPrediction(configs)
 else:
