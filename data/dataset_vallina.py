@@ -7,8 +7,8 @@ from ogb.nodeproppred import PygNodePropPredDataset
 
 
 input_dim_dict = {"KarateClub": 34, "Cora": 1433, "Citeseer": 3703, "PubMed": 500,
-                  'ogbn-arxiv': 128}
-class_num_dict = {"KarateClub": 4, "Cora": 7, "Citeseer": 6, "PubMed": 3, "ogbn-arxiv": 40}
+                  'ogbn-arxiv': 128, "CS": 6805}
+class_num_dict = {"KarateClub": 4, "Cora": 7, "Citeseer": 6, "PubMed": 3, "ogbn-arxiv": 40, "CS": 15}
 
 
 def load_data(root: str, data_name: str, split='public', num_val=0.1, num_test=0.8) -> Dataset:
