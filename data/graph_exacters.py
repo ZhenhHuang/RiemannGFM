@@ -48,7 +48,7 @@ def hierarchical_exacter(subset, edge_index, mapping, flow: str = 'source_to_tar
     else:
         col, row = edge_index
     tree_edges = []
-    align_dict = defaultdict(list)
+    # align_dict = defaultdict(list)
     visited = subset.new_empty(subset.size(0), dtype=torch.bool)
     visited.fill_(False)
     que, h_que = Queue(), Queue()
@@ -70,16 +70,16 @@ def hierarchical_exacter(subset, edge_index, mapping, flow: str = 'source_to_tar
         else:
             edges = torch.cartesian_prod(child, node)
         tree_edges.append(edges)
-        align_dict[h].append(edges)
+        # align_dict[h].append(edges)
         for ch in child:
             que.put(ch.reshape(-1))
             h_que.put(h + 1)
 
     if len(tree_edges):
         tree_edges = torch.sort(torch.cat(tree_edges, dim=0).t(), dim=-1)[0]
-    for k, v in align_dict.items():
-        align_dict[k] = torch.sort(torch.cat(v, dim=0).t(), dim=-1)[0]
-    return align_dict, tree_edges
+    # for k, v in align_dict.items():
+    #     align_dict[k] = torch.sort(torch.cat(v, dim=0).t(), dim=-1)[0]
+    return tree_edges
 
 
 # if __name__ == '__main__':
