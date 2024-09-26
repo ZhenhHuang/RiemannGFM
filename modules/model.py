@@ -67,7 +67,7 @@ class GeoGFM(nn.Module):
         # norm1 = x1.norm(dim=-1)
         # norm2 = x2.norm(dim=-1)
         # sim_matrix = torch.einsum('ik,jk->ij', x1, x2) / (torch.einsum('i,j->ij', norm1, norm2) + EPS)
-        sim_matrix = torch.cosine_similarity(x1, x2, dim=-1)
+        sim_matrix = torch.cosine_similarity(x1.unsqueeze(0), x2.unsqueeze(1), dim=-1)
         sim_matrix = torch.exp(sim_matrix / 0.2)
         pos_sim = sim_matrix.diag()
         loss_1 = pos_sim / (sim_matrix.sum(dim=-2) - pos_sim + EPS)
@@ -94,8 +94,8 @@ class InitBlock(nn.Module):
         :return: (E, H, S) Manifold initial representations
         """
         E = self.Euc_init(x, edge_index)
-        y = torch.ones_like(E) + torch.arange(E.shape[0], device=E.device).unsqueeze(-1) / E.shape[0]
-        # y = E
+        # y = torch.ones_like(E) + torch.arange(E.shape[0], device=E.device).unsqueeze(-1) / E.shape[0]
+        y = E
         H = self.Hyp_init(y, edge_index)
         S = self.Sph_init(y, edge_index)
         return E, H, S
