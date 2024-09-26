@@ -16,19 +16,19 @@ class EuclideanEncoder(nn.Module):
     """
     def __init__(self, in_dim, hidden_dim, out_dim, bias=True, activation=F.relu, dropout=0.1):
         super().__init__()
-        self.lin = GCNConv(in_dim, out_dim, bias=bias)
-        # self.lin = GCNConv(in_dim, hidden_dim, bias=bias)
-        # self.activation = F.relu
-        # self.proj = GCNConv(hidden_dim, out_dim, bias=bias)
-        # self.drop = dropout
-        self.res_lin = nn.Linear(in_dim, out_dim, bias=bias)
+        # self.lin = GCNConv(in_dim, out_dim, bias=bias)
+        self.lin = nn.Linear(in_dim, hidden_dim, bias=bias)
+        self.activation = F.relu
+        self.proj = nn.Linear(hidden_dim, out_dim, bias=bias)
+        self.drop = dropout
+        # self.res_lin = nn.Linear(in_dim, out_dim, bias=bias)
 
     def forward(self, x, edge_index):
-        x_res = x.clone()
-        # x = self.activation(self.lin(x, edge_index))
-        # x = self.proj(F.dropout(x, p=self.drop, training=self.training), edge_index)
-        x = self.lin(x, edge_index)
-        x = self.res_lin(x_res) + x
+        # x_res = x.clone()
+        x = self.activation(self.lin(x))
+        x = self.proj(F.dropout(x, p=self.drop, training=self.training))
+        # x = self.lin(x, edge_index)
+        # x = self.res_lin(x_res) + x
         return x
 
 
@@ -36,15 +36,17 @@ class ManifoldEncoder(nn.Module):
     def __init__(self, manifold, in_dim, hidden_dim, out_dim, bias=True, activation=None, dropout=0.1):
         super().__init__()
         self.manifold = manifold
-        self.lin = ConstCurveLinear(manifold, in_dim + 1, hidden_dim, bias=bias, dropout=dropout, activation=activation)
-        self.proj = ConstCurveLinear(manifold, hidden_dim, out_dim, bias=bias, dropout=dropout, activation=activation)
+        self.lin = ConstCurveLinear(manifold, in_dim, out_dim, bias=bias, dropout=dropout, activation=activation)
+        self.agg = ConstCurveAgg(manifold, out_dim, dropout, use_att=False)
+        # self.proj = ConstCurveLinear(manifold, hidden_dim, out_dim, bias=bias, dropout=dropout, activation=activation)
 
-    def forward(self, x):
-        o = torch.zeros_like(x).to(x.device)
-        x = torch.cat([o[:, 0:1], x], dim=1)
+    def forward(self, x, edge_index):
+        # o = torch.zeros_like(x).to(x.device)
+        # x = torch.cat([o[:, 0:1], x], dim=1)
         x = self.manifold.expmap0(x)
         x = self.lin(x)
-        x = self.proj(x)
+        x = self.agg(x, edge_index)
+        # x = self.proj(x)
         return x
 
 
@@ -123,9 +125,9 @@ class ConstCurveAgg(nn.Module):
             att_adj = 2 + 2 * self.manifold.cinner(query[dst], key[src])
             att_adj = att_adj / self.scale + self.bias
             att_adj = torch.sigmoid(att_adj)
-            support_t = scatter_sum(att_adj * x[src], dst, dim=0)
+            support_t = scatter_sum(att_adj * x[dst], src, dim=0)
         else:
-            support_t = scatter_sum(x[src], dst, dim=0)
+            support_t = scatter_sum(x[dst], src, dim=0)
 
         denorm = self.sign * self.manifold.inner(None, support_t, keepdim=True)
         denorm = denorm.abs().clamp_min(1e-8).sqrt()
