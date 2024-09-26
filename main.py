@@ -44,9 +44,9 @@ parser.add_argument('--embed_dim_lp', type=int, default=32)
 
 
 """Training settings"""
-parser.add_argument('--val_every', type=int, default=5)
+parser.add_argument('--val_every', type=int, default=1)
 parser.add_argument('--patience', type=int, default=3)
-parser.add_argument('--id', type=int, default=0)
+parser.add_argument('--id', type=int, default=1)
 
 # Pretraining
 parser.add_argument('--is_load', type=bool, default=False, help='Whether load model from checkpoints')
@@ -91,11 +91,11 @@ if configs.task_model_path is None:
 if configs.log_name is None:
     configs.log_name = f"{configs.task}_{configs.dataset}.log"
 
-pretrain_exp = Pretrain(configs)
-pretrain_exp.pretrain()
+# pretrain_exp = Pretrain(configs)
+# pretrain_exp.pretrain()
 
 if configs.task == 'NC':
-    exp = NodeClassification(configs, load=True, finetune=True)
+    exp = NodeClassification(configs, load=False, finetune=False)
 elif configs.task == 'LP':
     exp = LinkPrediction(configs)
 else:
