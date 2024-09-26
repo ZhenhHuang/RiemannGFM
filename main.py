@@ -17,8 +17,8 @@ parser = argparse.ArgumentParser(description='Geometric Graph Foundation Model')
 parser.add_argument('--task', type=str, default='NC',
                     choices=['NC', 'LP', 'GC'])
 parser.add_argument('--dataset', type=str, default='Cora',
-                    help=['computers', 'photo', 'KarateClub', 'CS', 'Physics'])
-parser.add_argument('--pretrain_dataset', nargs="+", type=str, default=['ogbn-arxiv'])
+                    help="['computers', 'photo', 'KarateClub', 'CS', 'Physics']")
+parser.add_argument('--pretrain_dataset', nargs="+", type=str, default=['PubMed'], help="[ogbn-arxiv, PubMed]")
 parser.add_argument('--root_path', type=str, default='D:\datasets\Graphs')
 parser.add_argument('--num_neighbors', type=int, nargs="+", default=[20, 20], help="Number of neighbors of data_loaders")
 parser.add_argument('--batch_size', type=int, default=32)
@@ -46,7 +46,7 @@ parser.add_argument('--embed_dim_lp', type=int, default=32)
 """Training settings"""
 parser.add_argument('--val_every', type=int, default=1)
 parser.add_argument('--patience', type=int, default=3)
-parser.add_argument('--id', type=int, default=1)
+parser.add_argument('--id', type=int, default=8)
 
 # Pretraining
 parser.add_argument('--is_load', type=bool, default=False, help='Whether load model from checkpoints')
@@ -58,7 +58,7 @@ parser.add_argument('--num_neg_samples', type=int, default=1000)
 
 # Node classification
 parser.add_argument('--nc_epochs', type=int, default=120)
-parser.add_argument('--lr_nc', type=float, default=0.001)
+parser.add_argument('--lr_nc', type=float, default=0.01)
 parser.add_argument('--weight_decay_nc', type=float, default=0.0000)
 parser.add_argument('--nc_mode', type=str, default="transductive",
                     choices=["transductive", "inductive"])
@@ -91,11 +91,13 @@ if configs.task_model_path is None:
 if configs.log_name is None:
     configs.log_name = f"{configs.task}_{configs.dataset}.log"
 
+print(configs)
+
 # pretrain_exp = Pretrain(configs)
 # pretrain_exp.pretrain()
 
 if configs.task == 'NC':
-    exp = NodeClassification(configs, load=False, finetune=False)
+    exp = NodeClassification(configs, load=True, finetune=True)
 elif configs.task == 'LP':
     exp = LinkPrediction(configs)
 else:

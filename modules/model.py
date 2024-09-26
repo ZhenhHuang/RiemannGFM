@@ -64,10 +64,9 @@ class GeoGFM(nn.Module):
 
     def cal_cl_loss(self, x1, x2):
         EPS = 1e-6
-        # norm1 = x1.norm(dim=-1)
-        # norm2 = x2.norm(dim=-1)
-        # sim_matrix = torch.einsum('ik,jk->ij', x1, x2) / (torch.einsum('i,j->ij', norm1, norm2) + EPS)
-        sim_matrix = torch.cosine_similarity(x1.unsqueeze(0), x2.unsqueeze(1), dim=-1)
+        norm1 = x1.norm(dim=-1)
+        norm2 = x2.norm(dim=-1)
+        sim_matrix = torch.einsum('ik,jk->ij', x1, x2) / (torch.einsum('i,j->ij', norm1, norm2) + EPS)
         sim_matrix = torch.exp(sim_matrix / 0.2)
         pos_sim = sim_matrix.diag()
         loss_1 = pos_sim / (sim_matrix.sum(dim=-2) - pos_sim + EPS)
