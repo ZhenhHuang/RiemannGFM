@@ -46,10 +46,10 @@ class GeoGFM(nn.Module):
         :return:
         """
 
-        E, H, S = x_tuple
-        x_E = E[:data.batch_size]
-        x_H = H[:data.batch_size]
-        x_S = S[:data.batch_size]
+        x_E, x_H, x_S = x_tuple
+        # x_E = E[:data.batch_size]
+        # x_H = H[:data.batch_size]
+        # x_S = S[:data.batch_size]
 
         H_E = self.manifold_H.proju(x_H, x_E)
         S_E = self.manifold_H.proju(x_S, x_E)
@@ -72,8 +72,8 @@ class GeoGFM(nn.Module):
         sim_matrix = torch.einsum('ik,jk->ij', x1, x2) / (torch.einsum('i,j->ij', norm1, norm2) + EPS)
         sim_matrix = torch.exp(sim_matrix / 0.2)
         pos_sim = sim_matrix.diag()
-        loss_1 = pos_sim / (sim_matrix.sum(dim=-2) - pos_sim + EPS)
-        loss_2 = pos_sim / (sim_matrix.sum(dim=-1) - pos_sim + EPS)
+        loss_1 = pos_sim / (sim_matrix.sum(dim=-2) + EPS)
+        loss_2 = pos_sim / (sim_matrix.sum(dim=-1) + EPS)
 
         loss_1 = -torch.log(loss_1).mean()
         loss_2 = -torch.log(loss_2).mean()
