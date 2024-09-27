@@ -4,7 +4,7 @@ import torch.nn as nn
 from torch.optim import Adam
 import numpy as np
 from modules import *
-from utils.train_utils import EarlyStopping, act_fn
+from utils.train_utils import EarlyStopping, act_fn, train_node2vec
 from utils.logger import create_logger
 from data import load_data, input_dim_dict, ExtractNodeLoader
 import os
@@ -31,7 +31,7 @@ class Pretrain:
                                            capacity=self.configs.capacity)
         else:
             raise NotImplementedError
-        return dataloader
+        return dataset, dataloader
 
     def build_model(self):
         model = GeoGFM(n_layers=self.configs.n_layers, in_dim=input_dim_dict[self.data_name],
@@ -52,13 +52,17 @@ class Pretrain:
             self.model.load_state_dict(model_dict)
         # early_stop = EarlyStopping(self.configs.patience)
 
-        dataloader = self.load_data(self.configs.pretrain_level)
+        dataset, dataloader = self.load_data(self.configs.pretrain_level)
+
+        tokens = train_node2vec(dataset[0], self.configs.embed_dim, self.device)
+
         optimizer = Adam(self.model.parameters(), lr=self.configs.lr, weight_decay=self.configs.weight_decay)
         for epoch in range(self.configs.pretrain_epochs):
             epoch_loss = []
             for data in tqdm(dataloader):
                 optimizer.zero_grad()
                 data = data.to(self.device)
+                data.tokens = tokens(data.n_id)
                 output = self.model(data)
                 loss = self.model.loss(output, data)
                 loss.backward()

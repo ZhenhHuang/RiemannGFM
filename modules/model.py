@@ -33,7 +33,7 @@ class GeoGFM(nn.Module):
         :return: z: node product representations
         """
         x = data.x.clone()
-        x_E, x_H, x_S = self.init_block(x, data.edge_index)  # [N, Hidden]
+        x_E, x_H, x_S = self.init_block(x, data.edge_index, data.tokens)  # [N, Hidden]
         for i, block in enumerate(self.blocks):
             x_E, x_H, x_S = block((x_E, x_H, x_S), data)
         return x_E, x_H, x_S
@@ -88,7 +88,7 @@ class InitBlock(nn.Module):
         self.Hyp_init = ManifoldEncoder(manifold_H, out_dim, hidden_dim, out_dim, bias, None, 0.)
         self.Sph_init = ManifoldEncoder(manifold_S, out_dim, hidden_dim, out_dim, bias, None, 0.)
 
-    def forward(self, x, edge_index):
+    def forward(self, x, edge_index, tokens):
         """
 
         :param x: raw features
@@ -97,9 +97,9 @@ class InitBlock(nn.Module):
         """
         E = self.Euc_init(x, edge_index)
         # y = torch.ones_like(E) + torch.arange(E.shape[0], device=E.device).unsqueeze(-1) / E.shape[0]
-        y = E
-        H = self.Hyp_init(y, edge_index)
-        S = self.Sph_init(y, edge_index)
+        # y = E
+        H = self.Hyp_init(tokens, edge_index)
+        S = self.Sph_init(tokens, edge_index)
         return E, H, S
 
 

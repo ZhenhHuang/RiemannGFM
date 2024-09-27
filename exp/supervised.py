@@ -1,17 +1,18 @@
 import torch
 import torch.nn.functional as F
 import torch.nn as nn
-from torch.optim import Adam
+from torch.optim import Adam, SparseAdam
 from geoopt.optim import RiemannianAdam
 import numpy as np
 from modules import *
-from utils.train_utils import EarlyStopping, act_fn
+from utils.train_utils import EarlyStopping, act_fn, train_node2vec
 from utils.evall_utils import cal_accuracy, cal_AUC_AP
 from utils.logger import create_logger
 from data import load_data, ExtractNodeLoader, ExtractLinkLoader, input_dim_dict, class_num_dict
 from torch_geometric.transforms import RandomLinkSplit
 import os
 from tqdm import tqdm
+from torch_geometric.nn.models import Node2Vec
 
 
 class SupervisedExp:
@@ -83,13 +84,16 @@ class NodeClassification(SupervisedExp):
         dataloader = ExtractNodeLoader(dataset[0], batch_size=self.configs.batch_size,
                                    num_neighbors=self.configs.num_neighbors,
                                    capacity=self.configs.capacity)
-        return dataloader
+        return dataset, dataloader
 
     def train(self):
         self.nc_model.train()
         optimizer = RiemannianAdam(self.nc_model.parameters(), lr=self.configs.lr_nc,
                          weight_decay=self.configs.weight_decay_nc)
-        dataloader = self.load_data("train")
+
+        dataset, dataloader = self.load_data("train")
+        tokens = train_node2vec(dataset[0], self.configs.embed_dim, self.device)
+
         early_stop = EarlyStopping(self.configs.patience)
         for epoch in range(self.configs.nc_epochs):
             epoch_loss = []
@@ -98,6 +102,7 @@ class NodeClassification(SupervisedExp):
 
             for data in tqdm(dataloader):
                 data = data.to(self.device)
+                data.tokens = tokens(data.n_id)
                 loss, correct, num = self.train_step(data, optimizer)
                 epoch_loss.append(loss)
                 matches += correct
@@ -193,7 +198,7 @@ class LinkPrediction(SupervisedExp):
                                      capacity=self.configs.capacity)
         if split == 'test':
             return test_loader
-        return train_loader, val_loader, test_loader
+        return train_data, train_loader, val_loader, test_loader
 
     def load_model(self):
         lp_model = LinkPredHead(self.pretrained_model,
@@ -204,7 +209,9 @@ class LinkPrediction(SupervisedExp):
     def train(self):
         self.lp_model.train()
         optimizer = Adam(self.lp_model.parameters(), lr=self.configs.lr_lp, weight_decay=self.configs.weight_decay_lp)
-        train_loader, val_loader, test_loader = self.load_data(None)
+        train_data, train_loader, val_loader, test_loader = self.load_data(None)
+        tokens = train_node2vec(train_data, self.configs.embed_dim, self.device)
+        self.tokens = tokens
         early_stop = EarlyStopping(self.configs.patience)
         for epoch in range(self.configs.lp_epochs):
             epoch_loss = []
@@ -213,6 +220,7 @@ class LinkPrediction(SupervisedExp):
 
             for data in tqdm(train_loader):
                 data = data.to(self.device)
+                data.tokens = tokens(data.n_id)
                 loss, pred, label = self.train_step(data, optimizer)
                 epoch_loss.append(loss)
                 epoch_label.append(label)
@@ -254,6 +262,7 @@ class LinkPrediction(SupervisedExp):
         with torch.no_grad():
             for data in val_loader:
                 data = data.to(self.device)
+                data.tokens = self.tokens(data.n_id)
                 pred, label = self.lp_model(data)
                 loss = F.binary_cross_entropy_with_logits(pred, label)
                 val_loss.append(loss.item())
@@ -278,6 +287,7 @@ class LinkPrediction(SupervisedExp):
         with torch.no_grad():
             for data in test_loader:
                 data = data.to(self.device)
+                data.tokens = self.tokens(data.n_id)
                 pred, label = self.lp_model(data)
                 test_label.append(label)
                 test_pred.append(pred)
