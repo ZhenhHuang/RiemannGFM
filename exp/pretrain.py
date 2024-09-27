@@ -51,6 +51,11 @@ class Pretrain:
             model_dict.update(pretrained_dict)
             self.model.load_state_dict(model_dict)
         # early_stop = EarlyStopping(self.configs.patience)
+
+
+
+
+
         dataloader = self.load_data(self.configs.pretrain_level)
         optimizer = Adam(self.model.parameters(), lr=self.configs.lr, weight_decay=self.configs.weight_decay)
         for epoch in range(self.configs.pretrain_epochs):

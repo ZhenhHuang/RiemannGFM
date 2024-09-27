@@ -80,7 +80,7 @@ class NodeClassification(SupervisedExp):
 
     def load_data(self, split: str):
         dataset = load_data(root=self.configs.root_path, data_name=self.configs.dataset)
-        dataloader = ExtractLoader(dataset[0], batch_size=self.configs.batch_size,
+        dataloader = ExtractNodeLoader(dataset[0], batch_size=self.configs.batch_size,
                                    num_neighbors=self.configs.num_neighbors,
                                    capacity=self.configs.capacity)
         return dataloader
