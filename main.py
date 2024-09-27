@@ -14,11 +14,11 @@ np.random.seed(seed)
 parser = argparse.ArgumentParser(description='Geometric Graph Foundation Model')
 
 """Dataset settings"""
-parser.add_argument('--task', type=str, default='NC',
+parser.add_argument('--task', type=str, default='LP',
                     choices=['NC', 'LP', 'GC'])
 parser.add_argument('--dataset', type=str, default='Cora',
                     help="['computers', 'photo', 'KarateClub', 'CS', 'Physics']")
-parser.add_argument('--pretrain_dataset', nargs="+", type=str, default=['PubMed'], help="[ogbn-arxiv, PubMed]")
+parser.add_argument('--pretrain_dataset', nargs="+", type=str, default=['ogbn-arxiv'], help="[ogbn-arxiv, PubMed]")
 parser.add_argument('--root_path', type=str, default='D:\datasets\Graphs')
 parser.add_argument('--num_neighbors', type=int, nargs="+", default=[20, 10], help="Number of neighbors of data_loaders")
 parser.add_argument('--batch_size', type=int, default=32)
@@ -46,7 +46,7 @@ parser.add_argument('--embed_dim_lp', type=int, default=32)
 """Training settings"""
 parser.add_argument('--val_every', type=int, default=1)
 parser.add_argument('--patience', type=int, default=3)
-parser.add_argument('--id', type=int, default=0)
+parser.add_argument('--id', type=int, default=9)
 
 # Pretraining
 parser.add_argument('--is_load', type=bool, default=False, help='Whether load model from checkpoints')
@@ -99,10 +99,10 @@ pretrain_exp.pretrain()
 if configs.task == 'NC':
     exp = NodeClassification(configs, load=True, finetune=True)
 elif configs.task == 'LP':
-    exp = LinkPrediction(configs)
+    exp = LinkPrediction(configs, load=True, finetune=True)
 else:
     raise NotImplementedError
 exp.train()
-# exp.test()
+# exp.test(None)
 
 torch.cuda.empty_cache()

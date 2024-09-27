@@ -54,21 +54,21 @@ class ExtractNodeLoader(NeighborLoader):
 class ExtractLinkLoader(LinkNeighborLoader):
     def __init__(self, data,
                 num_neighbors,
-                edge_label_index: InputEdges = None,
-                edge_label: OptTensor = None,
-                edge_label_time: OptTensor = None,
+                edge_label_index=None,
+                edge_label=None,
+                edge_label_time=None,
                 replace: bool = False,
                 directed: bool = True,
                 disjoint: bool = False,
                 temporal_strategy: str = 'uniform',
-                neg_sampling: Optional[NegativeSampling] = None,
+                neg_sampling=None,
                 neg_sampling_ratio: Optional[Union[int, float]] = None,
                 time_attr: Optional[str] = None,
                 transform: Optional[Callable] = None,
                 transform_sampler_output: Optional[Callable] = None,
                 is_sorted: bool = False,
                 filter_per_worker: bool = False,
-                neighbor_sampler: Optional[NeighborSampler] = None,
+                neighbor_sampler=None,
                 capacity: int = 1000, **kwargs):
         super(ExtractLinkLoader, self).__init__(
             data, num_neighbors, edge_label_index, edge_label, edge_label_time, replace, directed, disjoint, temporal_strategy,
@@ -79,6 +79,7 @@ class ExtractLinkLoader(LinkNeighborLoader):
 
     def __iter__(self):
         for key, data in enumerate(super().__iter__()):
+            data.batch_size = self.batch_size
             data.edge_index = add_self_loops(data.edge_index, num_nodes=data.num_nodes)[0]
             if key in self.cache:
                 data = self.cache.get(key)

@@ -211,7 +211,7 @@ class LinkPrediction(SupervisedExp):
             epoch_label = []
             epoch_pred = []
 
-            for data in train_loader:
+            for data in tqdm(train_loader):
                 data = data.to(self.device)
                 loss, pred, label = self.train_step(data, optimizer)
                 epoch_loss.append(loss)
@@ -230,11 +230,11 @@ class LinkPrediction(SupervisedExp):
                 val_loss, val_auc, val_ap = self.val(val_loader)
                 self.logger.info(f"Epoch {epoch}: val_loss={val_loss}, val_auc={val_auc * 100: .2f}%, "
                             f"val_ap={val_ap * 100: .2f}%")
-                early_stop(val_loss, self.nc_model, self.configs.checkpoints, self.configs.task_model_path)
+                early_stop(val_loss, self.lp_model, self.configs.checkpoints, self.configs.task_model_path)
                 if early_stop.early_stop:
                     print("---------Early stopping--------")
                     break
-        test_auc, test_ap = self.test()
+        test_auc, test_ap = self.test(test_loader)
         self.logger.info(f"test_auc={test_auc * 100: .2f}%, "
                          f"test_ap={test_ap * 100: .2f}%")
 
@@ -279,7 +279,6 @@ class LinkPrediction(SupervisedExp):
             for data in test_loader:
                 data = data.to(self.device)
                 pred, label = self.lp_model(data)
-                test_loss.append(loss.item())
                 test_label.append(label)
                 test_pred.append(pred)
             test_pred = torch.cat(test_pred, dim=-1).detach().cpu().numpy()
