@@ -3,6 +3,7 @@ import torch
 import torch.nn.functional as F
 import torch.nn as nn
 from torch_geometric.nn.conv import GCNConv
+from torch_geometric.utils import negative_sampling
 
 
 class NodeClsHead(nn.Module):
@@ -65,14 +66,21 @@ class LinkPredHead(nn.Module):
         x = torch.concat([x_E, x_h, x_s], dim=-1)
         x = self.head(x)
 
-        pos_edge_index = data.edge_index
-        neg_edge_index = data.neg_edge_index
-        x_src = x[pos_edge_index[0]]
-        x_dst = x[pos_edge_index[1]]
-        pos_score = F.cosine_similarity(x_src, x_dst, dim=-1)
+        neg_edge_index = negative_sampling(
+            edge_index=data.edge_index, num_nodes=data.num_nodes,
+            num_neg_samples=data.edge_label_index.size(1), method='sparse')
 
-        x_src = x[neg_edge_index[0]]
-        x_dst = x[neg_edge_index[1]]
-        neg_score = F.cosine_similarity(x_src, x_dst, dim=-1)
+        edge_label_index = torch.cat(
+            [data.edge_label_index, neg_edge_index],
+            dim=-1,
+        )
+        edge_label = torch.cat([
+            data.edge_label,
+            data.edge_label.new_zeros(neg_edge_index.size(1))
+        ], dim=0)
 
-        return pos_score, neg_score
+        x_src = x[edge_label_index[0]]
+        x_dst = x[edge_label_index[1]]
+        score = F.cosine_similarity(x_src, x_dst, dim=-1)
+
+        return score, edge_label

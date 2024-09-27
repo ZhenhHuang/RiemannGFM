@@ -5,9 +5,8 @@ from torch.optim import Adam
 import numpy as np
 from modules import *
 from utils.train_utils import EarlyStopping, act_fn
-from utils.evall_utils import cal_accuracy, cal_AUC_AP
 from utils.logger import create_logger
-from data import load_data, input_dim_dict, ExtractLoader
+from data import load_data, input_dim_dict, ExtractNodeLoader
 import os
 from tqdm import tqdm
 
@@ -27,9 +26,9 @@ class Pretrain:
     def load_data(self, task_level):
         if task_level == 'node':
             dataset = load_data(root=self.configs.root_path, data_name=self.data_name)
-            dataloader = ExtractLoader(dataset[0], batch_size=self.configs.batch_size,
-                                       num_neighbors=self.configs.num_neighbors,
-                                       capacity=self.configs.capacity)
+            dataloader = ExtractNodeLoader(dataset[0], batch_size=self.configs.batch_size,
+                                           num_neighbors=self.configs.num_neighbors,
+                                           capacity=self.configs.capacity)
         else:
             raise NotImplementedError
         return dataloader

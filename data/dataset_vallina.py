@@ -2,7 +2,7 @@ import torch
 import numpy as np
 from torch_geometric.data import Dataset, Data
 from torch_geometric.datasets import Amazon, Coauthor, KarateClub, Planetoid
-from torch_geometric.transforms import RandomNodeSplit
+from torch_geometric.transforms import RandomNodeSplit, RandomLinkSplit
 from ogb.nodeproppred import PygNodePropPredDataset
 
 
@@ -24,5 +24,7 @@ def load_data(root: str, data_name: str, split='public', num_val=0.1, num_test=0
         dataset = PygNodePropPredDataset(name=data_name, root=root)
     else:
         raise NotImplementedError
+    input_dim_dict[data_name] = dataset.num_features
+    class_num_dict[data_name] = dataset.num_classes
 
     return dataset

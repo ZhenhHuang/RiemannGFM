@@ -8,7 +8,8 @@ from modules import *
 from utils.train_utils import EarlyStopping, act_fn
 from utils.evall_utils import cal_accuracy, cal_AUC_AP
 from utils.logger import create_logger
-from data import *
+from data import load_data, ExtractNodeLoader, ExtractLinkLoader, input_dim_dict, class_num_dict
+from torch_geometric.transforms import RandomLinkSplit
 import os
 from tqdm import tqdm
 
@@ -78,16 +79,6 @@ class NodeClassification(SupervisedExp):
         return nc_model
 
     def load_data(self, split: str):
-        # if self.configs.nc_mode == 'inductive':
-        #     dataset = InductiveNodeClsDataset(raw_dataset=load_data(root=self.configs.root_path,
-        #                                                             data_name=self.configs.dataset),
-        #                                       configs=self.configs,
-        #                                       split=split)
-        # else:
-        #     dataset = TransductiveNodeClsDataset(raw_dataset=load_data(root=self.configs.root_path,
-        #                                                             data_name=self.configs.dataset),
-        #                                       configs=self.configs,
-        #                                       split=split)
         dataset = load_data(root=self.configs.root_path, data_name=self.configs.dataset)
         dataloader = ExtractLoader(dataset[0], batch_size=self.configs.batch_size,
                                    num_neighbors=self.configs.num_neighbors,
@@ -185,12 +176,24 @@ class LinkPrediction(SupervisedExp):
         self.lp_model = self.load_model()
 
     def load_data(self, split):
-        dataset = LinkPredDataset(raw_dataset=load_data(root=self.configs.root_path,
-                                                       data_name=self.configs.dataset),
-                                 configs=self.configs,
-                                 split=split)
-        dataloader = DataLoader(dataset, batch_size=1)
-        return dataset, dataloader
+        dataset = load_data(root=self.configs.root_path, data_name=self.configs.dataset)
+        train_data, val_data, test_data = RandomLinkSplit(is_undirected=True,
+                                                          add_negative_train_samples=False)(dataset[0])
+        train_loader = ExtractLinkLoader(train_data, batch_size=self.configs.batch_size,
+                                   num_neighbors=self.configs.num_neighbors,
+                                         neg_sampling_ratio=2.0,
+                                   capacity=self.configs.capacity)
+        val_loader = ExtractLinkLoader(val_data, batch_size=self.configs.batch_size,
+                                     num_neighbors=self.configs.num_neighbors,
+                                       neg_sampling_ratio=2.0,
+                                     capacity=self.configs.capacity)
+        test_loader = ExtractLinkLoader(test_data, batch_size=self.configs.batch_size,
+                                     num_neighbors=self.configs.num_neighbors,
+                                        neg_sampling_ratio=2.0,
+                                     capacity=self.configs.capacity)
+        if split == 'test':
+            return test_loader
+        return train_loader, val_loader, test_loader
 
     def load_model(self):
         lp_model = LinkPredHead(self.pretrained_model,
@@ -201,8 +204,7 @@ class LinkPrediction(SupervisedExp):
     def train(self):
         self.lp_model.train()
         optimizer = Adam(self.lp_model.parameters(), lr=self.configs.lr_lp, weight_decay=self.configs.weight_decay_lp)
-        train_set, train_loader = self.load_data("train")
-        val_set, val_loader = self.load_data("val")
+        train_loader, val_loader, test_loader = self.load_data(None)
         early_stop = EarlyStopping(self.configs.patience)
         for epoch in range(self.configs.lp_epochs):
             epoch_loss = []
@@ -213,10 +215,12 @@ class LinkPrediction(SupervisedExp):
                 data = data.to(self.device)
                 loss, pred, label = self.train_step(data, optimizer)
                 epoch_loss.append(loss)
-                epoch_label += label
-                epoch_pred += pred
+                epoch_label.append(label)
+                epoch_pred.append(pred)
 
             train_loss = np.mean(epoch_loss)
+            epoch_pred = torch.cat(epoch_pred, dim=-1).detach().cpu().numpy()
+            epoch_label = torch.cat(epoch_label, dim=-1).cpu().numpy()
             train_auc, train_ap = cal_AUC_AP(epoch_pred, epoch_label)
 
             self.logger.info(f"Epoch {epoch}: train_loss={train_loss}, train_auc={train_auc * 100: .2f}%, "
@@ -236,8 +240,8 @@ class LinkPrediction(SupervisedExp):
 
     def train_step(self, data, optimizer):
         optimizer.zero_grad()
-        out_pos, out_neg = self.lp_model(data)
-        loss, pred, label = self.cal_loss(out_pos, out_neg)
+        pred, label = self.lp_model(data)
+        loss = F.binary_cross_entropy_with_logits(pred, label)
         loss.backward()
         optimizer.step()
         return loss.item(), pred, label
@@ -250,37 +254,38 @@ class LinkPrediction(SupervisedExp):
         with torch.no_grad():
             for data in val_loader:
                 data = data.to(self.device)
-                out_pos, out_neg = self.lp_model(data)
-                loss, pred, label = self.cal_loss(out_pos, out_neg)
+                pred, label = self.lp_model(data)
+                loss = F.binary_cross_entropy_with_logits(pred, label)
                 val_loss.append(loss.item())
-                val_label += label
-                val_pred += pred
+                val_label.append(label)
+                val_pred.append(pred)
         val_loss = np.mean(val_loss)
+        val_pred = torch.cat(val_pred, dim=-1).detach().cpu().numpy()
+        val_label = torch.cat(val_label, dim=-1).cpu().numpy()
         val_auc, val_ap = cal_AUC_AP(val_pred, val_label)
         self.lp_model.train()
         return val_loss, val_auc, val_ap
 
-    def test(self):
-        test_set, test_loader = self.load_data("test")
+    def test(self, test_loader):
+        test_loader = self.load_data("test") if test_loader is None else test_loader
         self.lp_model.eval()
+        self.logger.info("--------------Testing--------------------")
+        path = os.path.join(self.configs.checkpoints, self.configs.task_model_path)
+        self.logger.info(f"--------------Loading from {path}--------------------")
+        self.lp_model.load_state_dict(torch.load(path))
         test_label = []
         test_pred = []
         with torch.no_grad():
             for data in test_loader:
                 data = data.to(self.device)
-                out_pos, out_neg = self.lp_model(data)
-                loss, pred, label = self.cal_loss(out_pos, out_neg)
-                test_label += label
-                test_pred += pred
-        test_auc, test_ap = cal_AUC_AP(test_pred, test_label)
+                pred, label = self.lp_model(data)
+                test_loss.append(loss.item())
+                test_label.append(label)
+                test_pred.append(pred)
+            test_pred = torch.cat(test_pred, dim=-1).detach().cpu().numpy()
+            test_label = torch.cat(test_label, dim=-1).cpu().numpy()
+            test_auc, test_ap = cal_AUC_AP(test_pred, test_label)
         return test_auc, test_ap
-
-    def cal_loss(self, out_pos, out_neg):
-        loss = F.binary_cross_entropy_with_logits(out_pos, torch.ones_like(out_pos)) + \
-               F.binary_cross_entropy_with_logits(out_neg, torch.zeros_like(out_neg))
-        label = [1] * out_pos.shape[0] + [0] * out_neg.shape[0]
-        preds = list(out_pos.detach().cpu().numpy()) + list(out_neg.detach().cpu().numpy())
-        return loss, preds, label
 
 
 class GraphClassification(SupervisedExp):
