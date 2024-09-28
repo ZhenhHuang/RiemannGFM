@@ -21,7 +21,7 @@ def load_data(root: str, data_name: str, split='public', num_val=0.1, num_test=0
     elif data_name in ['Cora', 'Citeseer', 'PubMed']:
         dataset = Planetoid(root, name=data_name)
     elif data_name == 'ogbn-arxiv':
-        dataset = PygNodePropPredDataset(name=data_name, root=root)
+        dataset = PygNodePropPredDataset(name=data_name, root=root, transform=RandomNodeSplit(num_val=0.2, num_test=0.3))
     else:
         raise NotImplementedError
     input_dim_dict[data_name] = dataset.num_features

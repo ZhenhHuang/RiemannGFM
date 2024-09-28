@@ -84,7 +84,7 @@ class GeoGFM(nn.Module):
 class InitBlock(nn.Module):
     def __init__(self, manifold_H, manifold_S, in_dim, hidden_dim, out_dim, bias, activation, dropout):
         super(InitBlock, self).__init__()
-        self.Euc_init = EuclideanEncoder(in_dim, hidden_dim, out_dim, bias, activation, dropout)
+        self.Euc_init = EuclideanEncoder(out_dim, hidden_dim, out_dim, bias, activation, dropout)
         self.Hyp_init = ManifoldEncoder(manifold_H, out_dim, hidden_dim, out_dim, bias, None, 0.)
         self.Sph_init = ManifoldEncoder(manifold_S, out_dim, hidden_dim, out_dim, bias, None, 0.)
 
@@ -95,7 +95,7 @@ class InitBlock(nn.Module):
         :param edge_index: edges
         :return: (E, H, S) Manifold initial representations
         """
-        E = self.Euc_init(x, edge_index)
+        E = self.Euc_init(tokens, edge_index)
         # y = torch.ones_like(E) + torch.arange(E.shape[0], device=E.device).unsqueeze(-1) / E.shape[0]
         # y = E
         H = self.Hyp_init(tokens, edge_index)
