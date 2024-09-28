@@ -47,7 +47,7 @@ class Pretrain:
             self.logger.info(f"---------------Loading pretrained models from {path}-------------")
             pretrained_dict = torch.load(path)
             model_dict = self.model.state_dict()
-            pretrained_dict = {k: v for k, v in pretrained_dict.items() if 'Euc_init' not in k}
+            # pretrained_dict = {k: v for k, v in pretrained_dict.items() if 'Euc_init' not in k}
             model_dict.update(pretrained_dict)
             self.model.load_state_dict(model_dict)
         # early_stop = EarlyStopping(self.configs.patience)

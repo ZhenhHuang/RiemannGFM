@@ -35,7 +35,7 @@ class SupervisedExp:
 
                 pretrained_dict = torch.load(path)
                 model_dict = pretrained_model.state_dict()
-                pretrained_dict = {k: v for k, v in pretrained_dict.items() if 'Euc_init' not in k}
+                # pretrained_dict = {k: v for k, v in pretrained_dict.items() if 'Euc_init' not in k}
                 model_dict.update(pretrained_dict)
                 pretrained_model.load_state_dict(model_dict)
 
