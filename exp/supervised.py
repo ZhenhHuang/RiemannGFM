@@ -42,9 +42,8 @@ class SupervisedExp:
         if finetune:
             self.logger.info("----------Freezing weights-----------")
             for module in pretrained_model.modules():
-                if not isinstance(module, (EuclideanEncoder, ManifoldEncoder)):
-                    for param in module.parameters():
-                        param.requires_grad = False
+                for param in module.parameters():
+                    param.requires_grad = False
         self.pretrained_model = pretrained_model.to(self.device)
 
     def load_model(self):
