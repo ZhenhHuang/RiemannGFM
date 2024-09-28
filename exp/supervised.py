@@ -80,18 +80,27 @@ class NodeClassification(SupervisedExp):
 
     def load_data(self, split: str):
         dataset = load_data(root=self.configs.root_path, data_name=self.configs.dataset)
-        dataloader = ExtractNodeLoader(dataset[0], batch_size=self.configs.batch_size,
+        data = dataset[0]
+        train_loader = ExtractNodeLoader(data, input_nodes=data.train_mask, batch_size=self.configs.batch_size,
                                    num_neighbors=self.configs.num_neighbors,
                                    capacity=self.configs.capacity)
-        return dataset, dataloader
+        val_loader = ExtractNodeLoader(data, input_nodes=data.val_mask, batch_size=self.configs.batch_size,
+                                         num_neighbors=self.configs.num_neighbors,
+                                         capacity=self.configs.capacity)
+        test_loader = ExtractNodeLoader(data, input_nodes=data.test_mask, batch_size=self.configs.batch_size,
+                                         num_neighbors=self.configs.num_neighbors,
+                                         capacity=self.configs.capacity)
+        if split == 'test':
+            return test_loader
+        return dataset, train_loader, val_loader, test_loader
 
     def train(self):
         self.nc_model.train()
         optimizer = RiemannianAdam(self.nc_model.parameters(), lr=self.configs.lr_nc,
                          weight_decay=self.configs.weight_decay_nc)
 
-        dataset, dataloader = self.load_data("train")
-        tokens = train_node2vec(dataset[0], self.configs.embed_dim, self.device)
+        dataset, train_loader, val_loader, test_loader = self.load_data("train")
+        self.tokens = train_node2vec(dataset[0], self.configs.embed_dim, self.device)
 
         early_stop = EarlyStopping(self.configs.patience)
         for epoch in range(self.configs.nc_epochs):
@@ -99,9 +108,9 @@ class NodeClassification(SupervisedExp):
             total = 0
             matches = 0
 
-            for data in tqdm(dataloader):
+            for data in tqdm(train_loader):
                 data = data.to(self.device)
-                data.tokens = tokens(data.n_id)
+                data.tokens = self.tokens(data.n_id)
                 loss, correct, num = self.train_step(data, optimizer)
                 epoch_loss.append(loss)
                 matches += correct
@@ -113,22 +122,22 @@ class NodeClassification(SupervisedExp):
             self.logger.info(f"Epoch {epoch}: train_loss={train_loss}, train_acc={train_acc * 100: .2f}%")
 
             if epoch % self.configs.val_every == 0:
-                val_loss, val_acc = self.val(dataloader)
+                val_loss, val_acc = self.val(val_loader)
                 self.logger.info(f"Epoch {epoch}: val_loss={val_loss}, val_acc={val_acc * 100: .2f}%")
                 early_stop(val_loss, self.nc_model, self.configs.checkpoints, self.configs.task_model_path)
                 if early_stop.early_stop:
                     print("---------Early stopping--------")
                     break
-        test_acc = self.test(dataloader)
+        test_acc = self.test(test_loader)
         self.logger.info(f"test_acc={test_acc * 100: .2f}%")
 
     def train_step(self, data, optimizer):
         optimizer.zero_grad()
         out = self.nc_model(data)
-        loss, correct = self.cal_loss(out, data.y, data.train_mask)
+        loss, correct = self.cal_loss(out, data.y, data.batch_size)
         loss.backward()
         optimizer.step()
-        return loss.item(), correct, data.train_mask.sum()
+        return loss.item(), correct, data.batch_size
 
     def val(self, val_loader):
         self.nc_model.eval()
@@ -138,11 +147,12 @@ class NodeClassification(SupervisedExp):
         with torch.no_grad():
             for data in val_loader:
                 data = data.to(self.device)
+                data.tokens = self.tokens(data.n_id)
                 out = self.nc_model(data)
-                loss, correct = self.cal_loss(out, data.y, data.val_mask)
+                loss, correct = self.cal_loss(out, data.y, data.batch_size)
                 val_loss.append(loss.item())
                 matches += correct
-                total += data.val_mask.sum()
+                total += data.batch_size
         self.nc_model.train()
         return np.mean(val_loss), (matches / total).item()
 
@@ -158,17 +168,18 @@ class NodeClassification(SupervisedExp):
         with torch.no_grad():
             for data in test_loader:
                 data = data.to(self.device)
+                data.tokens = self.tokens(data.n_id)
                 out = self.nc_model(data)
-                loss, correct = self.cal_loss(out, data.y, data.test_mask)
+                loss, correct = self.cal_loss(out, data.y, data.batch_size)
                 matches += correct
-                total += data.test_mask.sum()
+                total += data.batch_size
         test_acc = (matches / total).item()
         self.logger.info(f"test_acc={test_acc * 100: .2f}%")
         return test_acc
 
-    def cal_loss(self, output, label, mask):
-        out = output if self.configs.nc_mode == 'inductive' else output[mask]
-        y = label if self.configs.nc_mode == 'inductive' else label[mask]
+    def cal_loss(self, output, label, batch_size):
+        out = output[:batch_size]
+        y = label[:batch_size]
         loss = F.cross_entropy(out, y)
         correct = (out.argmax(dim=-1) == y).sum()
         return loss, correct
