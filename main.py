@@ -14,8 +14,8 @@ np.random.seed(seed)
 parser = argparse.ArgumentParser(description='Geometric Graph Foundation Model')
 
 """Dataset settings"""
-parser.add_argument('--task', type=str, default='NC',
-                    choices=['NC', 'LP', 'GC'])
+parser.add_argument('--task', type=str, default='Pretrain',
+                    choices=['NC', 'LP', 'GC', 'Pretrain'])
 parser.add_argument('--dataset', type=str, default='Cora',
                     help="['computers', 'photo', 'KarateClub', 'CS', 'Physics']")
 parser.add_argument('--pretrain_dataset', nargs="+", type=str, default=['PubMed'], help="[ogbn-arxiv, PubMed]")
@@ -54,7 +54,6 @@ parser.add_argument('--pretrain_level', type=str, default="node", help='pretrain
 parser.add_argument('--pretrain_epochs', type=int, default=3)
 parser.add_argument('--lr', type=float, default=0.01)
 parser.add_argument('--weight_decay', type=float, default=0.0)
-parser.add_argument('--num_neg_samples', type=int, default=1000)
 
 # Node classification
 parser.add_argument('--nc_epochs', type=int, default=120)
@@ -93,16 +92,16 @@ if configs.log_name is None:
 
 print(configs)
 
-# pretrain_exp = Pretrain(configs)
-# pretrain_exp.pretrain()
-
 if configs.task == 'NC':
+    pretrain_exp = Pretrain(configs)
+    pretrain_exp.pretrain()
+elif configs.task == 'NC':
     exp = NodeClassification(configs, load=True, finetune=True)
+    exp.train()
 elif configs.task == 'LP':
     exp = LinkPrediction(configs, load=True, finetune=True)
+    exp.train()
 else:
     raise NotImplementedError
-exp.train()
-# exp.test(None)
 
 torch.cuda.empty_cache()
