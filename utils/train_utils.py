@@ -5,6 +5,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch_geometric.nn.models import Node2Vec
 from torch.optim import SparseAdam
+import warnings
+warnings.filterwarnings("ignore")
 
 
 def train_node2vec(data, embed_dim, device):

@@ -42,7 +42,7 @@ class Pretrain:
         self.model = model
 
     def _train(self, load=False):
-        path = os.path.join(self.configs.checkpoints, self.configs.pretrained_model_path)
+        path = os.path.join(self.configs.checkpoints, self.configs.pretrained_model_path) + f"_{self.configs.id}.pt"
         if load:
             self.logger.info(f"---------------Loading pretrained models from {path}-------------")
             pretrained_dict = torch.load(path)

@@ -14,11 +14,11 @@ np.random.seed(seed)
 parser = argparse.ArgumentParser(description='Geometric Graph Foundation Model')
 
 """Dataset settings"""
-parser.add_argument('--task', type=str, default='Pretrain',
+parser.add_argument('--task', type=str, default='NC',
                     choices=['NC', 'LP', 'GC', 'Pretrain'])
 parser.add_argument('--dataset', type=str, default='Cora',
                     help="['computers', 'photo', 'KarateClub', 'CS', 'Physics']")
-parser.add_argument('--pretrain_dataset', nargs="+", type=str, default=['PubMed'], help="[ogbn-arxiv, PubMed]")
+parser.add_argument('--pretrain_dataset', nargs="+", type=str, default=['ogbn-arxiv'], help="[ogbn-arxiv, PubMed]")
 parser.add_argument('--root_path', type=str, default='D:\datasets\Graphs')
 parser.add_argument('--num_neighbors', type=int, nargs="+", default=[20, 10], help="Number of neighbors of data_loaders")
 parser.add_argument('--batch_size', type=int, default=32)
@@ -92,7 +92,7 @@ if configs.log_name is None:
 
 print(configs)
 
-if configs.task == 'NC':
+if configs.task == 'Pretrain':
     pretrain_exp = Pretrain(configs)
     pretrain_exp.pretrain()
 elif configs.task == 'NC':
