@@ -26,7 +26,9 @@ class Pretrain:
     def load_data(self, task_level):
         if task_level == 'node':
             dataset = load_data(root=self.configs.root_path, data_name=self.data_name)
-            dataloader = ExtractNodeLoader(dataset[0], batch_size=self.configs.batch_size,
+            data = dataset[0]
+            data.num_classes = dataset.num_classes
+            dataloader = ExtractNodeLoader(data, batch_size=self.configs.batch_size,
                                            num_neighbors=self.configs.num_neighbors,
                                            capacity=self.configs.capacity)
         else:
