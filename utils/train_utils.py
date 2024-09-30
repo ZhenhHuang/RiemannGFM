@@ -33,7 +33,7 @@ def train_node2vec(data, embed_dim, device):
             loss.backward()
             optimizer.step()
             total_loss += loss.item()
-        # loss = total_loss / len(loader)
+        loss = total_loss / len(loader)
         # model.eval()
         # with torch.no_grad():
         #     z = model()
@@ -45,6 +45,7 @@ def train_node2vec(data, embed_dim, device):
         #         max_iter=150,
         #     )
         # print(f'Epoch: {epoch:03d}, Loss: {loss:.4f}, Acc: {acc:.4f}')
+        print(f'Epoch: {epoch:03d}, Loss: {loss:.4f}')
     return model
 
 

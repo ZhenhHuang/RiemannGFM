@@ -37,16 +37,18 @@ class ExtractNodeLoader(NeighborLoader):
 
     def __iter__(self):
         for key, data in enumerate(super().__iter__()):
-            data = label2node(data, self.num_classes) if self.num_classes is not None else data
+            if self.num_classes is not None:
+                data = label2node(data, self.num_classes)
+                data.n_id = torch.cat(
+                    [data.n_id, torch.arange(self.data.num_nodes, self.data.num_nodes + self.num_classes)], dim=0)
             data.edge_index = add_self_loops(data.edge_index, num_nodes=data.num_nodes)[0]
-            data.n_id = torch.cat([data.n_id, torch.arange(self.data.num_nodes, self.data.num_nodes + self.num_classes)], dim=0)
             if key in self.cache:
                 data = self.cache.get(key)
             else:
                 tree_list = []
                 subset, sub_edge_index = data.n_id, data.edge_index
                 G = to_networkx(Data(edge_index=sub_edge_index, num_nodes=subset.shape[0]))
-                for m, seed_node in enumerate(data.n_id[: data.batch_size]):
+                for m, seed_node in enumerate(data.n_id[:data.batch_size]):
                     sorted_edges = sorted(list(nx.bfs_tree(G, m).edges()))
                     tG = nx.Graph()
                     tG.add_edges_from(sorted_edges)

@@ -18,7 +18,7 @@ parser.add_argument('--task', type=str, default='NC',
                     choices=['NC', 'LP', 'GC', 'Pretrain'])
 parser.add_argument('--dataset', type=str, default='Cora',
                     help="['computers', 'photo', 'KarateClub', 'CS', 'Physics']")
-parser.add_argument('--pretrain_dataset', nargs="+", type=str, default=['Cora'], help="[ogbn-arxiv, PubMed]")
+parser.add_argument('--pretrain_dataset', nargs="+", type=str, default=['PubMed'], help="[ogbn-arxiv, PubMed]")
 parser.add_argument('--root_path', type=str, default='D:\datasets\Graphs')
 parser.add_argument('--num_neighbors', type=int, nargs="+", default=[20, 10],
                     help="Number of neighbors of data_loaders")
