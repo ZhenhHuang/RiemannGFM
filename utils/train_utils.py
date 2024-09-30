@@ -13,6 +13,7 @@ def train_node2vec(data, embed_dim, device):
     model = Node2Vec(
         data.edge_index,
         embedding_dim=embed_dim,
+        num_nodes=data.num_nodes,
         walk_length=20,
         context_size=10,
         walks_per_node=10,

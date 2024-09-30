@@ -19,7 +19,7 @@ parser.add_argument('--task', type=str, default='NC',
 parser.add_argument('--dataset', type=str, default='Cora',
                     help="['computers', 'photo', 'KarateClub', 'CS', 'Physics']")
 parser.add_argument('--pretrain_dataset', nargs="+", type=str, default=['ogbn-arxiv'], help="[ogbn-arxiv, PubMed]")
-parser.add_argument('--root_path', type=str, default='D:\datasets\Graphs')
+parser.add_argument('--root_path', type=str, default='./datasets')
 parser.add_argument('--num_neighbors', type=int, nargs="+", default=[20, 10], help="Number of neighbors of data_loaders")
 parser.add_argument('--batch_size', type=int, default=32)
 parser.add_argument('--capacity', type=int, default=1000, help="Capacity of Cache for dataloader")
@@ -96,8 +96,9 @@ if configs.task == 'Pretrain':
     pretrain_exp = Pretrain(configs)
     pretrain_exp.pretrain()
 elif configs.task == 'NC':
-    exp = NodeClassification(configs, load=False, finetune=False)
-    exp.train()
+    # exp = NodeClassification(configs, load=False, finetune=False)
+    # exp.train()
+    exp = ZeroShot(configs)
 elif configs.task == 'LP':
     exp = LinkPrediction(configs, load=True, finetune=True)
     exp.train()

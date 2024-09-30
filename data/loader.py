@@ -40,8 +40,14 @@ class ExtractNodeLoader(NeighborLoader):
             else:
                 tree_list = []
                 subset, sub_edge_index = data.n_id, data.edge_index
+                G = to_networkx(Data(edge_index=sub_edge_index, num_nodes=subset.shape[0]))
                 for m, seed_node in enumerate(data.n_id[: data.batch_size]):
-                    tree_edge_index = hierarchical_exacter(subset, sub_edge_index, torch.tensor([m]).long(), flow='source_to_target')
+                    sorted_edges = sorted(list(nx.bfs_tree(G, m).edges()))
+                    tG = nx.Graph()
+                    tG.add_edges_from(sorted_edges)
+                    tree_edge_index = from_networkx(tG).edge_index
+                    del tG
+                    # tree_edge_index = hierarchical_exacter(subset, sub_edge_index, torch.tensor([m]).long(), flow='source_to_target')
                     tree_list.append(Data(edge_index=tree_edge_index, num_nodes=subset.shape[0], seed_node=seed_node))
                 batch_tree = Batch.from_data_list(tree_list)
                 data.batch_tree = batch_tree
