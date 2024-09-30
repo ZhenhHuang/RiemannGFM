@@ -39,6 +39,7 @@ class ExtractNodeLoader(NeighborLoader):
         for key, data in enumerate(super().__iter__()):
             data = label2node(data, self.num_classes) if self.num_classes is not None else data
             data.edge_index = add_self_loops(data.edge_index, num_nodes=data.num_nodes)[0]
+            data.n_id = torch.cat([data.n_id, torch.arange(self.data.num_nodes, self.data.num_nodes + self.num_classes)], dim=0)
             if key in self.cache:
                 data = self.cache.get(key)
             else:

@@ -19,7 +19,7 @@ class ZeroShot(Pretrain):
         super(ZeroShot, self).__init__(configs)
         self.configs = configs
         self.load = load
-        self.build_model()
+        # self.build_model()
         if load:
             pretrained_dict = torch.load(self.configs.pretrained_model_path_ZSL)
             model_dict = self.model.state_dict()
@@ -38,6 +38,7 @@ class ZeroShot(Pretrain):
                                            capacity=self.configs.capacity, K_shot=0, num_classes=dataset.num_classes)
         else:
             raise NotImplementedError
+        data = label2node(data.clone(), dataset.num_classes)
         return data, dataloader
 
     def load_transfer_data(self):
@@ -52,14 +53,15 @@ class ZeroShot(Pretrain):
         if self.load is False:
             self.pretrain()
         transfer_set, transfer_loader = self.load_transfer_data()
+        transfer_data = label2node(transfer_set[0], transfer_set.num_classes)
+        tokens = train_node2vec(transfer_data, self.configs.embed_dim, self.device)
         self.logger.info(f"-----------Zero Shot testing on dataset {self.configs.dataset}-----------")
         total = 0
         matches = 0
         self.model.eval()
         for data in tqdm(transfer_loader):
             data = data.to(self.device)
-            tokens = train_node2vec(data, self.configs.embed_dim, self.device)
-            data.tokens = tokens()
+            data.tokens = tokens(data.n_id)
             x_E, x_H, x_S = self.model(data)
             manifold_H = self.model.manifold_H
             manifold_S = self.model.manifold_S

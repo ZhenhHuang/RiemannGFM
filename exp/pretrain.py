@@ -20,7 +20,7 @@ class Pretrain:
             self.device = torch.device('cuda')
         else:
             self.device = torch.device('cpu')
-        # self.build_model()
+        self.build_model()
         # self.data_name = self.configs.dataset
 
     def load_data(self, task_level, data_name):
@@ -32,7 +32,7 @@ class Pretrain:
                                            capacity=self.configs.capacity)
         else:
             raise NotImplementedError
-        return dataset, dataloader
+        return data, dataloader
 
     def build_model(self):
         model = GeoGFM(n_layers=self.configs.n_layers, in_dim=self.configs.embed_dim,
@@ -52,9 +52,9 @@ class Pretrain:
             self.model.load_state_dict(model_dict)
 
         path = os.path.join(self.configs.checkpoints, self.configs.pretrained_model_path)
-        dataset, dataloader = self.load_data(self.configs.pretrain_level, data_name)
+        data, dataloader = self.load_data(self.configs.pretrain_level, data_name)
 
-        # tokens = train_node2vec(data, self.configs.embed_dim, self.device)
+        tokens = train_node2vec(data, self.configs.embed_dim, self.device)
 
         optimizer = Adam(self.model.parameters(), lr=self.configs.lr, weight_decay=self.configs.weight_decay)
         for epoch in range(self.configs.pretrain_epochs):
@@ -62,9 +62,7 @@ class Pretrain:
             for data in tqdm(dataloader):
                 optimizer.zero_grad()
                 data = data.to(self.device)
-                tokens = train_node2vec(data, self.configs.embed_dim, self.device)
-                data.tokens = tokens()
-                # data.tokens = tokens(data.n_id)
+                data.tokens = tokens(data.n_id)
                 output = self.model(data)
                 loss = self.model.loss(output, data)
                 loss.backward()
