@@ -96,7 +96,7 @@ if configs.task == 'Pretrain':
     pretrain_exp = Pretrain(configs)
     pretrain_exp.pretrain()
 elif configs.task == 'NC':
-    exp = NodeClassification(configs, load=True, finetune=True)
+    exp = NodeClassification(configs, load=False, finetune=False)
     exp.train()
 elif configs.task == 'LP':
     exp = LinkPrediction(configs, load=True, finetune=True)
