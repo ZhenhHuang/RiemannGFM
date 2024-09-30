@@ -18,9 +18,10 @@ parser.add_argument('--task', type=str, default='NC',
                     choices=['NC', 'LP', 'GC', 'Pretrain'])
 parser.add_argument('--dataset', type=str, default='Cora',
                     help="['computers', 'photo', 'KarateClub', 'CS', 'Physics']")
-parser.add_argument('--pretrain_dataset', nargs="+", type=str, default=['ogbn-arxiv'], help="[ogbn-arxiv, PubMed]")
-parser.add_argument('--root_path', type=str, default='./datasets')
-parser.add_argument('--num_neighbors', type=int, nargs="+", default=[20, 10], help="Number of neighbors of data_loaders")
+parser.add_argument('--pretrain_dataset', nargs="+", type=str, default=['Cora'], help="[ogbn-arxiv, PubMed]")
+parser.add_argument('--root_path', type=str, default='D:\datasets\Graphs')
+parser.add_argument('--num_neighbors', type=int, nargs="+", default=[20, 10],
+                    help="Number of neighbors of data_loaders")
 parser.add_argument('--batch_size', type=int, default=32)
 parser.add_argument('--capacity', type=int, default=1000, help="Capacity of Cache for dataloader")
 
@@ -42,18 +43,20 @@ parser.add_argument('--activation', type=str, default=None)
 # LP head
 parser.add_argument('--embed_dim_lp', type=int, default=32)
 
-
 """Training settings"""
 parser.add_argument('--val_every', type=int, default=1)
 parser.add_argument('--patience', type=int, default=3)
 parser.add_argument('--id', type=int, default=2)
 
-# Pretraining
+"""Pretraining"""
 parser.add_argument('--is_load', type=bool, default=False, help='Whether load model from checkpoints')
 parser.add_argument('--pretrain_level', type=str, default="node", help='pretraining task level')
-parser.add_argument('--pretrain_epochs', type=int, default=3)
+parser.add_argument('--pretrain_epochs', type=int, default=1)
 parser.add_argument('--lr', type=float, default=0.01)
 parser.add_argument('--weight_decay', type=float, default=0.0)
+
+# Zero-Shot Learning
+parser.add_argument('--pretrained_model_path_ZSL', type=str, default="./pretrained_models")
 
 # Node classification
 parser.add_argument('--nc_epochs', type=int, default=120)
@@ -99,6 +102,7 @@ elif configs.task == 'NC':
     # exp = NodeClassification(configs, load=False, finetune=False)
     # exp.train()
     exp = ZeroShot(configs)
+    exp.test()
 elif configs.task == 'LP':
     exp = LinkPrediction(configs, load=True, finetune=True)
     exp.train()

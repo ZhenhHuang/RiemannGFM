@@ -25,7 +25,7 @@ class SupervisedExp:
             self.device = torch.device('cpu')
 
         if pretrained_model is None:
-            pretrained_model = GeoGFM(n_layers=self.configs.n_layers, in_dim=input_dim_dict[self.configs.dataset],
+            pretrained_model = GeoGFM(n_layers=self.configs.n_layers, in_dim=self.configs.embed_dim,
                                       hidden_dim=self.configs.hidden_dim, embed_dim=self.configs.embed_dim,
                                       bias=self.configs.bias,
                                       dropout=self.configs.dropout, activation=act_fn(self.configs.activation))

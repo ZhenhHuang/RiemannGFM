@@ -84,13 +84,14 @@ class GeoGFM(nn.Module):
 class InitBlock(nn.Module):
     def __init__(self, manifold_H, manifold_S, in_dim, hidden_dim, out_dim, bias, activation, dropout):
         super(InitBlock, self).__init__()
-        self.Euc_init = EuclideanEncoder(out_dim, hidden_dim, out_dim, bias, activation, dropout)
-        self.Hyp_init = ManifoldEncoder(manifold_H, out_dim, hidden_dim, out_dim, bias, None, 0.)
-        self.Sph_init = ManifoldEncoder(manifold_S, out_dim, hidden_dim, out_dim, bias, None, 0.)
+        self.Euc_init = EuclideanEncoder(in_dim, hidden_dim, out_dim, bias, activation, dropout)
+        self.Hyp_init = ManifoldEncoder(manifold_H, in_dim, hidden_dim, out_dim, bias, None, 0.)
+        self.Sph_init = ManifoldEncoder(manifold_S, in_dim, hidden_dim, out_dim, bias, None, 0.)
 
     def forward(self, x, edge_index, tokens):
         """
 
+        :param tokens: input tokens
         :param x: raw features
         :param edge_index: edges
         :return: (E, H, S) Manifold initial representations

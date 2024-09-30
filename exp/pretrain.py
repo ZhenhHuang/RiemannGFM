@@ -21,13 +21,12 @@ class Pretrain:
         else:
             self.device = torch.device('cpu')
         # self.build_model()
-        self.data_name = None
+        # self.data_name = self.configs.dataset
 
-    def load_data(self, task_level):
+    def load_data(self, task_level, data_name):
         if task_level == 'node':
-            dataset = load_data(root=self.configs.root_path, data_name=self.data_name)
+            dataset = load_data(root=self.configs.root_path, data_name=data_name)
             data = dataset[0]
-            data.num_classes = dataset.num_classes
             dataloader = ExtractNodeLoader(data, batch_size=self.configs.batch_size,
                                            num_neighbors=self.configs.num_neighbors,
                                            capacity=self.configs.capacity)
@@ -36,27 +35,26 @@ class Pretrain:
         return dataset, dataloader
 
     def build_model(self):
-        model = GeoGFM(n_layers=self.configs.n_layers, in_dim=input_dim_dict[self.data_name],
+        model = GeoGFM(n_layers=self.configs.n_layers, in_dim=self.configs.embed_dim,
                       hidden_dim=self.configs.hidden_dim, embed_dim=self.configs.embed_dim,
                       bias=self.configs.bias,
                       dropout=self.configs.dropout,
                        activation=act_fn(self.configs.activation)).to(self.device)
         self.model = model
 
-    def _train(self, load=False):
-        path = os.path.join(self.configs.checkpoints, self.configs.pretrained_model_path) + f"_{self.configs.id}.pt"
+    def _train(self, load=False, data_name=None):
         if load:
-            self.logger.info(f"---------------Loading pretrained models from {path}-------------")
-            pretrained_dict = torch.load(path)
+            load_path = os.path.join(self.configs.checkpoints, self.configs.pretrained_model_path) + f"_{self.configs.id}.pt"
+            self.logger.info(f"---------------Loading pretrained models from {load_path}-------------")
+            pretrained_dict = torch.load(load_path)
             model_dict = self.model.state_dict()
-            # pretrained_dict = {k: v for k, v in pretrained_dict.items() if 'Euc_init' not in k}
             model_dict.update(pretrained_dict)
             self.model.load_state_dict(model_dict)
-        # early_stop = EarlyStopping(self.configs.patience)
 
-        dataset, dataloader = self.load_data(self.configs.pretrain_level)
+        path = os.path.join(self.configs.checkpoints, self.configs.pretrained_model_path)
+        dataset, dataloader = self.load_data(self.configs.pretrain_level, data_name)
 
-        tokens = train_node2vec(dataset[0], self.configs.embed_dim, self.device)
+        # tokens = train_node2vec(data, self.configs.embed_dim, self.device)
 
         optimizer = Adam(self.model.parameters(), lr=self.configs.lr, weight_decay=self.configs.weight_decay)
         for epoch in range(self.configs.pretrain_epochs):
@@ -64,7 +62,9 @@ class Pretrain:
             for data in tqdm(dataloader):
                 optimizer.zero_grad()
                 data = data.to(self.device)
-                data.tokens = tokens(data.n_id)
+                tokens = train_node2vec(data, self.configs.embed_dim, self.device)
+                data.tokens = tokens()
+                # data.tokens = tokens(data.n_id)
                 output = self.model(data)
                 loss = self.model.loss(output, data)
                 loss.backward()
@@ -84,10 +84,10 @@ class Pretrain:
             self.configs.pretrain_dataset = [self.configs.pretrain_dataset]
         for i, data_name in enumerate(self.configs.pretrain_dataset):
             load = True
-            self.data_name = data_name
+            # self.data_name = data_name
             self.logger.info(f"----------Pretraining on {data_name}--------------")
-            self.build_model()
+            # self.build_model()
             if i == 0:
                 load = False
-            self._train(load)
+            self._train(load, data_name)
             torch.cuda.empty_cache()
