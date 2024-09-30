@@ -1,12 +1,12 @@
 import torch
+from torch_geometric.utils import to_undirected
 
 
-def mask_edges(edge_index, neg_edges, val_prop, test_prop):
-    n = len(edge_index[0])
-    n_val = int(val_prop * n)
-    n_test = int(test_prop * n)
-    edge_val, edge_test, edge_train = edge_index[:, :n_val], edge_index[:, n_val:n_val + n_test], edge_index[:,
-                                                                                                  n_val + n_test:]
-    val_edges_neg, test_edges_neg = neg_edges[:, :n_val], neg_edges[:, n_val:n_test + n_val]
-    train_edges_neg = torch.concat([neg_edges, val_edges_neg, test_edges_neg], dim=-1)
-    return (edge_train, edge_val, edge_test), (train_edges_neg, val_edges_neg, test_edges_neg)
+def label2node(data, num_classes):
+    y_ext = data.y + data.num_nodes
+    label_edges = torch.stack([torch.arange(data.num_nodes), y_ext], dim=0)
+    label_edges = to_undirected(label_edges)
+    label_nodes = torch.rand(num_classes, data.num_features)
+    data.x = torch.cat([data.x, label_nodes], dim=0)
+    data.edge_index = torch.cat([data.edge_index, label_edges], dim=-1)
+    return data
