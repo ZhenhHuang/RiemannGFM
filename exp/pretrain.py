@@ -75,15 +75,16 @@ class Pretrain:
             self.logger.info(f"---------------Saving pretrained models to {path}_{epoch}.pt-------------")
             torch.save(self.model.state_dict(), path + f".pt")  # save for next training
 
-    def pretrain(self):
+    def pretrain(self, first_load=False, start_data=None):
         if not isinstance(self.configs.pretrain_dataset, list):
             self.configs.pretrain_dataset = [self.configs.pretrain_dataset]
         for i, data_name in enumerate(self.configs.pretrain_dataset):
+            if start_data is not None:
+                if data_name != start_data:
+                    continue
             load = True
-            # self.data_name = data_name
             self.logger.info(f"----------Pretraining on {data_name}--------------")
-            # self.build_model()
             if i == 0:
-                load = False
+                load = first_load
             self._train(load, data_name)
             torch.cuda.empty_cache()

@@ -14,10 +14,11 @@ class ExtractNodeLoader(NeighborLoader):
                  input_nodes=None,
                  input_time=None,
                  replace: bool = False,
-                 directed: bool = True,
+                 subgraph_type='directional',
                  disjoint: bool = False,
                  temporal_strategy: str = 'uniform',
                  time_attr: Optional[str] = None,
+                 weight_attr=None,
                  transform: Optional[Callable] = None,
                  transform_sampler_output: Optional[Callable] = None,
                  is_sorted: bool = False,
@@ -25,8 +26,8 @@ class ExtractNodeLoader(NeighborLoader):
                  neighbor_sampler=None,
                  capacity: int = 1000, **kwargs):
         super(ExtractNodeLoader, self).__init__(
-            data, num_neighbors, input_nodes, input_time, replace, directed,
-            disjoint, temporal_strategy, time_attr, transform,
+            data, num_neighbors, input_nodes, input_time, replace, subgraph_type,
+            disjoint, temporal_strategy, time_attr, weight_attr, transform,
             transform_sampler_output, is_sorted, filter_per_worker, neighbor_sampler,
             **kwargs
         )
@@ -65,12 +66,13 @@ class ExtractLinkLoader(LinkNeighborLoader):
                 edge_label=None,
                 edge_label_time=None,
                 replace: bool = False,
-                directed: bool = True,
+                subgraph_type='directional',
                 disjoint: bool = False,
                 temporal_strategy: str = 'uniform',
                 neg_sampling=None,
                 neg_sampling_ratio: Optional[Union[int, float]] = None,
                 time_attr: Optional[str] = None,
+                 weight_attr=None,
                 transform: Optional[Callable] = None,
                 transform_sampler_output: Optional[Callable] = None,
                 is_sorted: bool = False,
@@ -78,8 +80,8 @@ class ExtractLinkLoader(LinkNeighborLoader):
                 neighbor_sampler=None,
                 capacity: int = 1000, **kwargs):
         super(ExtractLinkLoader, self).__init__(
-            data, num_neighbors, edge_label_index, edge_label, edge_label_time, replace, directed, disjoint, temporal_strategy,
-            neg_sampling, neg_sampling_ratio, time_attr, transform, transform_sampler_output, is_sorted,
+            data, num_neighbors, edge_label_index, edge_label, edge_label_time, replace, subgraph_type, disjoint, temporal_strategy,
+            neg_sampling, neg_sampling_ratio, time_attr, weight_attr, transform, transform_sampler_output, is_sorted,
             filter_per_worker, neighbor_sampler, **kwargs
         )
         self.cache = LRUCache(capacity=capacity)

@@ -14,12 +14,12 @@ np.random.seed(seed)
 parser = argparse.ArgumentParser(description='Geometric Graph Foundation Model')
 
 """Dataset settings"""
-parser.add_argument('--task', type=str, default='NC',
+parser.add_argument('--task', type=str, default='Pretrain',
                     choices=['NC', 'LP', 'GC', 'Pretrain'])
 parser.add_argument('--dataset', type=str, default='Cora',
                     help="['computers', 'photo', 'KarateClub', 'CS', 'Physics']")
 parser.add_argument('--pretrain_dataset', nargs="+", type=str,
-                    default=['ogbn-arxiv', 'computers', 'Flickr'],
+                    default=['Reddit'],
                     help="[ogbn-arxiv, PubMed]")
 parser.add_argument('--root_path', type=str, default='./datasets')
 parser.add_argument('--num_neighbors', type=int, nargs="+", default=[20, 10],
@@ -101,7 +101,7 @@ print(configs)
 
 if configs.task == 'Pretrain':
     pretrain_exp = Pretrain(configs)
-    pretrain_exp.pretrain()
+    pretrain_exp.pretrain(first_load=False, start_data=None)
 elif configs.task == 'NC':
     exp = NodeClassification(configs, load=False, finetune=False)
     exp.train()
