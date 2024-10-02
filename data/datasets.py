@@ -29,7 +29,7 @@ def load_data(root: str, data_name: str, split='public', num_val=0.1, num_test=0
     elif data_name in ["USA", "Brazil", "Europe"]:
         dataset = Airports(root, data_name, transform=RandomNodeSplit(num_val=0.1, num_test=0.2))
     elif data_name == 'Flickr':
-        dataset = Flickr(root)
+        dataset = Flickr(os.path.join(root, "Flickr"))
     elif data_name == 'Reddit':
         dataset = Reddit(root)
     else:
