@@ -44,7 +44,7 @@ class Pretrain:
 
     def _train(self, load=False, data_name=None):
         if load:
-            load_path = os.path.join(self.configs.checkpoints, self.configs.pretrained_model_path) + f"_{self.configs.id}.pt"
+            load_path = os.path.join(self.configs.checkpoints, self.configs.pretrained_model_path) + f".pt"
             self.logger.info(f"---------------Loading pretrained models from {load_path}-------------")
             pretrained_dict = torch.load(load_path)
             model_dict = self.model.state_dict()
@@ -71,11 +71,9 @@ class Pretrain:
             train_loss = np.mean(epoch_loss)
             self.logger.info(f"Epoch {epoch}: train_loss={train_loss}")
             self.logger.info(f"---------------Saving pretrained models to {path}_{epoch}.pt-------------")
-            torch.save(self.model.state_dict(), path + f"_{epoch}.pt")
-            # early_stop(train_loss, self.model, self.configs.checkpoints, self.configs.pretrained_model_path)
-            # if early_stop.early_stop:
-            #     print("---------Early stopping--------")
-            #     break
+            torch.save(self.model.state_dict(), path + f"_{epoch}.pt")  # save epoch every
+            self.logger.info(f"---------------Saving pretrained models to {path}_{epoch}.pt-------------")
+            torch.save(self.model.state_dict(), path + f".pt")  # save for next training
 
     def pretrain(self):
         if not isinstance(self.configs.pretrain_dataset, list):

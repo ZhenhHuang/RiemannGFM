@@ -6,7 +6,6 @@ from torch_geometric.utils import add_self_loops, to_networkx, from_networkx
 from data.graph_exacters import hierarchical_exacter
 from collections import OrderedDict
 import networkx as nx
-from utils.data_utils import label2node
 
 
 class ExtractNodeLoader(NeighborLoader):
@@ -24,7 +23,7 @@ class ExtractNodeLoader(NeighborLoader):
                  is_sorted: bool = False,
                  filter_per_worker: bool = False,
                  neighbor_sampler=None,
-                 capacity: int = 1000, K_shot: int = None, num_classes=None, **kwargs):
+                 capacity: int = 1000, **kwargs):
         super(ExtractNodeLoader, self).__init__(
             data, num_neighbors, input_nodes, input_time, replace, directed,
             disjoint, temporal_strategy, time_attr, transform,
@@ -32,15 +31,9 @@ class ExtractNodeLoader(NeighborLoader):
             **kwargs
         )
         self.cache = LRUCache(capacity=capacity)
-        #   TODO: K_shot
-        self.num_classes = num_classes
 
     def __iter__(self):
         for key, data in enumerate(super().__iter__()):
-            if self.num_classes is not None:
-                data = label2node(data, self.num_classes)
-                data.n_id = torch.cat(
-                    [data.n_id, torch.arange(self.data.num_nodes, self.data.num_nodes + self.num_classes)], dim=0)
             data.edge_index = add_self_loops(data.edge_index, num_nodes=data.num_nodes)[0]
             if key in self.cache:
                 data = self.cache.get(key)
