@@ -95,16 +95,15 @@ class NodeClassification(SupervisedExp):
         return dataset, train_loader, val_loader, test_loader
 
     def train(self):
-        self.nc_model.train()
-        optimizer = RiemannianAdam(self.nc_model.parameters(), lr=self.configs.lr_nc,
-                         weight_decay=self.configs.weight_decay_nc)
-
         dataset, train_loader, val_loader, test_loader = self.load_data("train")
-        self.tokens = train_node2vec(dataset[0], self.configs.embed_dim, self.device)
-
-        early_stop = EarlyStopping(self.configs.patience)
         total_test_acc = []
         for t in range(self.configs.exp_iters):
+            self.nc_model = self.load_model()
+            self.nc_model.train()
+            optimizer = RiemannianAdam(self.nc_model.parameters(), lr=self.configs.lr_nc,
+                                       weight_decay=self.configs.weight_decay_nc)
+            self.tokens = train_node2vec(dataset[0], self.configs.embed_dim, self.device)
+            early_stop = EarlyStopping(self.configs.patience)
             for epoch in range(self.configs.nc_epochs):
                 epoch_loss = []
                 total = 0
@@ -222,14 +221,16 @@ class LinkPrediction(SupervisedExp):
         return lp_model
 
     def train(self):
-        self.lp_model.train()
-        optimizer = Adam(self.lp_model.parameters(), lr=self.configs.lr_lp, weight_decay=self.configs.weight_decay_lp)
         train_data, train_loader, val_loader, test_loader = self.load_data(None)
-        tokens = train_node2vec(train_data, self.configs.embed_dim, self.device)
-        self.tokens = tokens
-        early_stop = EarlyStopping(self.configs.patience)
         total_test_auc, total_test_ap = [], []
         for _ in range(self.configs.exp_iters):
+            self.lp_model = self.load_model()
+            self.lp_model.train()
+            optimizer = Adam(self.lp_model.parameters(), lr=self.configs.lr_lp,
+                             weight_decay=self.configs.weight_decay_lp)
+            tokens = train_node2vec(train_data, self.configs.embed_dim, self.device)
+            self.tokens = tokens
+            early_stop = EarlyStopping(self.configs.patience)
             for epoch in range(self.configs.lp_epochs):
                 epoch_loss = []
                 epoch_label = []
