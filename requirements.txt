@@ -1,10 +1,13 @@
 geoopt==0.5.0
 matplotlib==3.8.2
 networkx==3.0
-numpy==1.22.4
+numpy~=1.26.3
 ogb==1.3.5
 scikit_learn==1.5.2
 torch==2.0.1+cu117
 torch_geometric==2.6.1
 torch_scatter==2.1.1+pt20cu117
 tqdm==4.65.2
+
+gensim~=4.3.3
+scikit-learn~=1.0.2

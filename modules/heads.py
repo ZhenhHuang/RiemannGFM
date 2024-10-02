@@ -104,3 +104,32 @@ class LinkPredHead(nn.Module):
         score = F.cosine_similarity(x_src, x_dst, dim=-1)
 
         return score, edge_label
+
+
+class ShotNCHead(nn.Module):
+    def __init__(self, pretrained_model, cls_embeddings, in_dim, cls_dim):
+        """
+
+        :param in_dim: input dimension of three components
+        :param num_cls: number of classes
+        """
+        super(ShotNCHead, self).__init__()
+        self.pretrained_model = pretrained_model
+        self.head = GCNConv(in_dim, cls_dim)
+        self.cls_embeddings = cls_embeddings
+
+    def forward(self, data):
+        """
+
+        :param data
+        :return:
+        """
+        x_E, x_H, x_S = self.pretrained_model(data)
+        manifold_H = self.pretrained_model.manifold_H
+        manifold_S = self.pretrained_model.manifold_S
+        x_h = manifold_H.logmap0(x_H)
+        x_s = manifold_S.logmap0(x_S)
+        x = torch.concat([x_E, x_h, x_s], dim=-1)
+        x = self.head(x, data.edge_index)
+        out = F.cosine_similarity(x.unsqueeze(1), self.cls_embeddings.unsqueeze(0), dim=-1)
+        return out

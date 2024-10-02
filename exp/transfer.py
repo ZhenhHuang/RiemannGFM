@@ -4,75 +4,181 @@ import torch.nn as nn
 from torch.optim import Adam
 import numpy as np
 from modules import *
+from gensim.models import Word2Vec
+import gensim.downloader as api
 from utils.train_utils import EarlyStopping, act_fn, train_node2vec
 from utils.data_utils import label2node
 from utils.logger import create_logger
 from data import load_data, input_dim_dict, ExtractNodeLoader
+from data.mappings import class_maps
 import os
 from tqdm import tqdm
-from exp.supervised import LinkPrediction
-from exp.pretrain import Pretrain
+from exp.supervised import NodeClassification
+import re
 
 
-class ZeroShot(Pretrain):
+class ZeroShotNC:
     def __init__(self, configs, load: bool = False):
-        super(ZeroShot, self).__init__(configs)
         self.configs = configs
         self.load = load
-        # self.build_model()
-        if load:
-            pretrained_dict = torch.load(self.configs.pretrained_model_path_ZSL)
-            model_dict = self.model.state_dict()
-            model_dict.update(pretrained_dict)
-            self.model.load_state_dict(model_dict)
+        self.load_word2vec()
+        self.supp_sets = self.configs.supp_sets
+        self.query_set = self.configs.query_set
+        supp_embed_dict, query_embed_dict = self.get_class_embedding(self.supp_sets, self.query_set)
+        self.merge_embeddings(supp_embed_dict, query_embed_dict)
+        self.load_model()
 
-    def build_model(self):
-        super().build_model()
+    def load_model(self):
+        pretrained_model = GeoGFM(n_layers=self.configs.n_layers, in_dim=self.configs.embed_dim,
+                                  hidden_dim=self.configs.hidden_dim, embed_dim=self.configs.embed_dim,
+                                  bias=self.configs.bias,
+                                  dropout=self.configs.dropout, activation=act_fn(self.configs.activation))
+        path = os.path.join(self.configs.checkpoints, self.configs.pretrained_model_path) + ".pt"
+        self.logger.info(f"---------------Loading pretrained models from {path}-------------")
+        pretrained_dict = torch.load(path)
+        model_dict = pretrained_model.state_dict()
+        model_dict.update(pretrained_dict)
+        pretrained_model.load_state_dict(model_dict)
 
-    def load_data(self, task_level, data_name):
-        if task_level == 'node':
-            dataset = load_data(root=self.configs.root_path, data_name=data_name)
-            data = dataset[0]
-            dataloader = ExtractNodeLoader(data, batch_size=self.configs.batch_size,
-                                           num_neighbors=self.configs.num_neighbors,
-                                           capacity=self.configs.capacity, K_shot=0, num_classes=dataset.num_classes)
-        else:
-            raise NotImplementedError
-        data = label2node(data.clone(), dataset.num_classes)
+        self.logger.info("----------Freezing weights-----------")
+        for module in pretrained_model.modules():
+            for param in module.parameters():
+                param.requires_grad = False
+        self.pretrained_model = pretrained_model.to(self.device)
+        self.nc_model = ShotNCHead(self.pretrained_model, self.class_embeddings, 3 * self.configs.embed_dim,
+                               100).to(self.device)
+
+    def load_data(self, data_name):
+        if data_name == self.query_set:
+            dataset = load_data(root=self.configs.root_path, data_name=self.query_set)
+            data = self.convert_label(dataset[0].clone(), self.query_set)
+            query_loader = ExtractNodeLoader(data, input_nodes=data.train_mask, batch_size=self.configs.batch_size,
+                                            num_neighbors=self.configs.num_neighbors,
+                                            capacity=self.configs.capacity)
+            return data, query_loader
+        dataset = load_data(root=self.configs.root_path, data_name=data_name)
+        data = self.convert_label(dataset[0].clone(), data_name)
+        dataloader = ExtractNodeLoader(data, batch_size=self.configs.batch_size,
+                                       num_neighbors=self.configs.num_neighbors,
+                                       capacity=self.configs.capacity)
         return data, dataloader
 
-    def load_transfer_data(self):
-        dataset = load_data(root=self.configs.root_path, data_name=self.configs.dataset)
-        data = dataset[0]
-        transfer_loader = ExtractNodeLoader(data, input_nodes=data.train_mask, batch_size=self.configs.batch_size,
-                                        num_neighbors=self.configs.num_neighbors,
-                                        capacity=self.configs.capacity, K_shot=0, num_classes=dataset.num_classes)
-        return dataset, transfer_loader
+    def train(self):
+        if not isinstance(self.configs.supp_sets, list):
+            self.configs.supp_sets = [self.configs.supp_sets]
+        for i, data_name in enumerate(self.supp_sets):
+            load = True
+            if i == 0:
+                load = False
+            self._train_step(load, data_name)
+            torch.cuda.empty_cache()
 
     def test(self):
-        if self.load is False:
-            self.pretrain()
-        transfer_set, transfer_loader = self.load_transfer_data()
-        transfer_data = label2node(transfer_set[0], transfer_set.num_classes)
-        tokens = train_node2vec(transfer_data, self.configs.embed_dim, self.device)
-        self.logger.info(f"-----------Zero Shot testing on dataset {self.configs.dataset}-----------")
+        data, test_loader = self.load_data("test")
+        tokens = train_node2vec(data, self.configs.embed_dim, self.device)
+        self.nc_model.eval()
+        self.logger.info("--------------Testing--------------------")
+        path = os.path.join(self.configs.checkpoints, self.configs.task_model_path)
+        self.logger.info(f"--------------Loading from {path}--------------------")
+        self.nc_model.load_state_dict(torch.load(path))
         total = 0
         matches = 0
-        self.model.eval()
-        for data in tqdm(transfer_loader):
-            data = data.to(self.device)
-            data.tokens = tokens(data.n_id)
-            x_E, x_H, x_S = self.model(data)
-            manifold_H = self.model.manifold_H
-            manifold_S = self.model.manifold_S
-            x_h = manifold_H.logmap0(x_H)
-            x_s = manifold_S.logmap0(x_S)
-            x = torch.concat([x_E, x_h, x_s], dim=-1)
-            node, label = x[:data.batch_size], x[-transfer_set.num_classes:]
-            sim = F.cosine_similarity(node.unsqueeze(1), label.unsqueeze(0), dim=-1)
-            correct = (sim.argmax(dim=-1) == data.y[:data.batch_size]).sum()
-            matches += correct
-            total += data.batch_size
+        with torch.no_grad():
+            for data in test_loader:
+                data = data.to(self.device)
+                data.tokens = tokens(data.n_id)
+                out = self.nc_model(data)
+                loss, correct = self.cal_loss(out, data.y, data.batch_size)
+                matches += correct
+                total += data.batch_size
         test_acc = (matches / total).item()
         self.logger.info(f"test_acc={test_acc * 100: .2f}%")
         return test_acc
+
+    def _train_step(self, load, data_name):
+        if load:
+            load_path = os.path.join(self.configs.checkpoints, self.configs.pretrained_model_path_ZSL) + f".pt"
+            self.logger.info(f"---------------Loading pretrained models from {load_path}-------------")
+            pretrained_dict = torch.load(load_path)
+            model_dict = self.nc_model.state_dict()
+            model_dict.update(pretrained_dict)
+            self.nc_model.load_state_dict(model_dict)
+
+        path = os.path.join(self.configs.checkpoints, self.configs.pretrained_model_path_ZSL)
+        data, dataloader = self.load_data(data_name)
+
+        tokens = train_node2vec(data, self.configs.embed_dim, self.device)
+
+        optimizer = Adam(self.model.parameters(), lr=self.configs.lr, weight_decay=self.configs.weight_decay)
+        for epoch in range(self.configs.pretrain_epochs):
+            epoch_loss = []
+            total = 0
+            matches = 0
+            for data in tqdm(dataloader):
+                optimizer.zero_grad()
+                data = data.to(self.device)
+                data.tokens = tokens(data.n_id)
+                out = self.nc_model(data)
+                loss, correct = self.cal_loss(out, data.y, data.batch_size)
+                if torch.isnan(loss).item():
+                    continue
+                loss.backward()
+                optimizer.step()
+                epoch_loss.append(loss.item())
+                matches += correct
+                total += data.batch_size
+            train_loss = np.mean(epoch_loss)
+            train_acc = (matches / total).item()
+            self.logger.info(f"Epoch {epoch}: train_loss={train_loss}, train_acc={train_acc * 100: .2f}%")
+            self.logger.info(f"---------------Saving pretrained models to {path}_{epoch}.pt-------------")
+            torch.save(self.model.state_dict(), path + f"_{epoch}.pt")  # save epoch every
+            self.logger.info(f"---------------Saving pretrained models to {path}_{epoch}.pt-------------")
+            torch.save(self.model.state_dict(), path + f".pt")  # save for next training
+
+    def load_word2vec(self, word2vec_path='glove-wiki-gigaword-100'):
+        self.word2vec = api.load(word2vec_path)
+
+    def get_class_embedding(self, supp_sets: list, query_set: str):
+        sp_pattern = r'[ -.]+'
+        supp_embed_dict = {}
+        for data_name in supp_sets:
+            supp_embed_dict[data_name] = {}
+            cls_map = class_maps[data_name]
+            for k, word in cls_map.items():
+                text = re.split(sp_pattern, word)
+                supp_embed_dict[data_name][k] = np.mean([self.word2vec[t.lower()] for t in text], axis=0)
+
+        query_embed_dict = {}
+        cls_map = class_maps[query_set]
+        for k, word in cls_map.items():
+            text = re.split(sp_pattern, word)
+            query_embed_dict[k] = np.mean([self.word2vec[t.lower()] for t in text], axis=0)
+
+        return supp_embed_dict, query_embed_dict
+
+    def merge_embeddings(self, supp_embed_dict, query_embed_dict):
+        merge_embed_dict = {}
+        offset_dict = {}
+        for i, (data_name, d) in enumerate(supp_embed_dict.items()):
+            offset = len(merge_embed_dict)
+            offset_dict[data_name] = offset
+            for key, value in d.items():
+                merge_embed_dict[key + offset] = value
+        offset = len(merge_embed_dict)
+        offset_dict[self.query_set] = offset
+        for key, value in query_embed_dict.items():
+            merge_embed_dict[key + offset] = value
+        merge_embed = np.stack([em for em in merge_embed_dict.values()], axis=0)
+        self.class_embeddings = torch.tensor(merge_embed).to(self.device)
+        self.offset_dict = offset_dict
+
+    def convert_label(self, data, data_name):
+        data.y = data.y + self.offset_dict[data_name]
+        return data
+
+    def cal_loss(self, output, label, batch_size):
+        out = output[:batch_size]
+        y = label[:batch_size]
+        loss = F.cross_entropy(out, y)
+        correct = (out.argmax(dim=-1) == y).sum()
+        return loss, correct

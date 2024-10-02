@@ -19,8 +19,10 @@ parser.add_argument('--task', type=str, default='NC',
 parser.add_argument('--dataset', type=str, default='Cora',
                     help="['computers', 'photo', 'KarateClub', 'CS', 'Physics']")
 parser.add_argument('--pretrain_dataset', nargs="+", type=str,
-                    default=['Flickr'],
-                    help="[ogbn-arxiv, PubMed, Flickr]")
+                    default=['Flickr', 'ogbn-arxiv', 'computers'])
+parser.add_argument('--supp_sets', nargs="+", type=str,
+                    default=['Flickr', 'ogbn-arxiv', 'computers'])
+parser.add_argument('--query_set', type=str, default='Cora')
 parser.add_argument('--root_path', type=str, default='./datasets')
 parser.add_argument('--num_neighbors', type=int, nargs="+", default=[20, 10],
                     help="Number of neighbors of data_loaders")
