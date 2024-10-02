@@ -65,6 +65,8 @@ class Pretrain:
                 data.tokens = tokens(data.n_id)
                 output = self.model(data)
                 loss = self.model.loss(output, data)
+                if torch.isnan(loss).item():
+                    continue
                 loss.backward()
                 optimizer.step()
                 epoch_loss.append(loss.item())

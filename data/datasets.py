@@ -1,7 +1,8 @@
 import torch
 import numpy as np
 from torch_geometric.data import Dataset, Data
-from torch_geometric.datasets import Amazon, Coauthor, KarateClub, Planetoid, GitHub, Airports, Flickr, Reddit
+from torch_geometric.datasets import (Amazon, Coauthor, KarateClub, Planetoid,
+                                      GitHub, Airports, Flickr, Reddit, PolBlogs)
 from torch_geometric.transforms import RandomNodeSplit, RandomLinkSplit
 from ogb.nodeproppred import PygNodePropPredDataset
 import os
@@ -32,6 +33,8 @@ def load_data(root: str, data_name: str, split='public', num_val=0.1, num_test=0
         dataset = Flickr(os.path.join(root, "Flickr"))
     elif data_name == 'Reddit':
         dataset = Reddit(root)
+    elif data_name == 'PolBlogs':
+        dataset = PolBlogs(root, transform=RandomNodeSplit(num_val=0.1, num_test=0.2))
     else:
         raise NotImplementedError
     input_dim_dict[data_name] = dataset.num_features
