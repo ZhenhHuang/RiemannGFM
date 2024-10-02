@@ -103,33 +103,38 @@ class NodeClassification(SupervisedExp):
         self.tokens = train_node2vec(dataset[0], self.configs.embed_dim, self.device)
 
         early_stop = EarlyStopping(self.configs.patience)
-        for epoch in range(self.configs.nc_epochs):
-            epoch_loss = []
-            total = 0
-            matches = 0
+        total_test_acc = []
+        for t in range(self.configs.exp_iters):
+            for epoch in range(self.configs.nc_epochs):
+                epoch_loss = []
+                total = 0
+                matches = 0
 
-            for data in tqdm(train_loader):
-                data = data.to(self.device)
-                data.tokens = self.tokens(data.n_id)
-                loss, correct, num = self.train_step(data, optimizer)
-                epoch_loss.append(loss)
-                matches += correct
-                total += num
+                for data in tqdm(train_loader):
+                    data = data.to(self.device)
+                    data.tokens = self.tokens(data.n_id)
+                    loss, correct, num = self.train_step(data, optimizer)
+                    epoch_loss.append(loss)
+                    matches += correct
+                    total += num
 
-            train_loss = np.mean(epoch_loss)
-            train_acc = (matches / total).item()
+                train_loss = np.mean(epoch_loss)
+                train_acc = (matches / total).item()
 
-            self.logger.info(f"Epoch {epoch}: train_loss={train_loss}, train_acc={train_acc * 100: .2f}%")
+                self.logger.info(f"Epoch {epoch}: train_loss={train_loss}, train_acc={train_acc * 100: .2f}%")
 
-            if epoch % self.configs.val_every == 0:
-                val_loss, val_acc = self.val(val_loader)
-                self.logger.info(f"Epoch {epoch}: val_loss={val_loss}, val_acc={val_acc * 100: .2f}%")
-                early_stop(val_loss, self.nc_model, self.configs.checkpoints, self.configs.task_model_path)
-                if early_stop.early_stop:
-                    print("---------Early stopping--------")
-                    break
-        test_acc = self.test(test_loader)
-        self.logger.info(f"test_acc={test_acc * 100: .2f}%")
+                if epoch % self.configs.val_every == 0:
+                    val_loss, val_acc = self.val(val_loader)
+                    self.logger.info(f"Epoch {epoch}: val_loss={val_loss}, val_acc={val_acc * 100: .2f}%")
+                    early_stop(val_loss, self.nc_model, self.configs.checkpoints, self.configs.task_model_path)
+                    if early_stop.early_stop:
+                        print("---------Early stopping--------")
+                        break
+            test_acc = self.test(test_loader)
+            self.logger.info(f"test_acc={test_acc * 100: .2f}%")
+            total_test_acc.append(test_acc)
+        mean, std = np.mean(total_test_acc), np.std(total_test_acc)
+        self.logger.info(f"Evaluation Acc is {mean * 100: .2f}% +- {std * 100: .2f}%")
 
     def train_step(self, data, optimizer):
         optimizer.zero_grad()
@@ -223,38 +228,46 @@ class LinkPrediction(SupervisedExp):
         tokens = train_node2vec(train_data, self.configs.embed_dim, self.device)
         self.tokens = tokens
         early_stop = EarlyStopping(self.configs.patience)
-        for epoch in range(self.configs.lp_epochs):
-            epoch_loss = []
-            epoch_label = []
-            epoch_pred = []
+        total_test_auc, total_test_ap = [], []
+        for _ in range(self.configs.exp_iters):
+            for epoch in range(self.configs.lp_epochs):
+                epoch_loss = []
+                epoch_label = []
+                epoch_pred = []
 
-            for data in tqdm(train_loader):
-                data = data.to(self.device)
-                data.tokens = tokens(data.n_id)
-                loss, pred, label = self.train_step(data, optimizer)
-                epoch_loss.append(loss)
-                epoch_label.append(label)
-                epoch_pred.append(pred)
+                for data in tqdm(train_loader):
+                    data = data.to(self.device)
+                    data.tokens = tokens(data.n_id)
+                    loss, pred, label = self.train_step(data, optimizer)
+                    epoch_loss.append(loss)
+                    epoch_label.append(label)
+                    epoch_pred.append(pred)
 
-            train_loss = np.mean(epoch_loss)
-            epoch_pred = torch.cat(epoch_pred, dim=-1).detach().cpu().numpy()
-            epoch_label = torch.cat(epoch_label, dim=-1).cpu().numpy()
-            train_auc, train_ap = cal_AUC_AP(epoch_pred, epoch_label)
+                train_loss = np.mean(epoch_loss)
+                epoch_pred = torch.cat(epoch_pred, dim=-1).detach().cpu().numpy()
+                epoch_label = torch.cat(epoch_label, dim=-1).cpu().numpy()
+                train_auc, train_ap = cal_AUC_AP(epoch_pred, epoch_label)
 
-            self.logger.info(f"Epoch {epoch}: train_loss={train_loss}, train_auc={train_auc * 100: .2f}%, "
-                        f"train_ap={train_ap * 100: .2f}%")
+                self.logger.info(f"Epoch {epoch}: train_loss={train_loss}, train_auc={train_auc * 100: .2f}%, "
+                            f"train_ap={train_ap * 100: .2f}%")
 
-            if epoch % self.configs.val_every == 0:
-                val_loss, val_auc, val_ap = self.val(val_loader)
-                self.logger.info(f"Epoch {epoch}: val_loss={val_loss}, val_auc={val_auc * 100: .2f}%, "
-                            f"val_ap={val_ap * 100: .2f}%")
-                early_stop(val_loss, self.lp_model, self.configs.checkpoints, self.configs.task_model_path)
-                if early_stop.early_stop:
-                    print("---------Early stopping--------")
-                    break
-        test_auc, test_ap = self.test(test_loader)
-        self.logger.info(f"test_auc={test_auc * 100: .2f}%, "
-                         f"test_ap={test_ap * 100: .2f}%")
+                if epoch % self.configs.val_every == 0:
+                    val_loss, val_auc, val_ap = self.val(val_loader)
+                    self.logger.info(f"Epoch {epoch}: val_loss={val_loss}, val_auc={val_auc * 100: .2f}%, "
+                                f"val_ap={val_ap * 100: .2f}%")
+                    early_stop(val_loss, self.lp_model, self.configs.checkpoints, self.configs.task_model_path)
+                    if early_stop.early_stop:
+                        print("---------Early stopping--------")
+                        break
+            test_auc, test_ap = self.test(test_loader)
+            self.logger.info(f"test_auc={test_auc * 100: .2f}%, "
+                             f"test_ap={test_ap * 100: .2f}%")
+            total_test_auc.append(test_auc)
+            total_test_ap.append(test_ap)
+        mean_auc, std_auc = np.mean(total_test_auc), np.std(total_test_auc)
+        mean_ap, std_ap = np.mean(total_test_ap), np.std(total_test_ap)
+        self.logger.info(f"Evaluation AUC={mean_auc * 100: .2f}% +- {std_auc * 100: .2f}%, "
+                         f"Evaluation AP={mean_ap * 100: .2f}% +- {std_ap * 100: .2f}%")
 
     def train_step(self, data, optimizer):
         optimizer.zero_grad()
