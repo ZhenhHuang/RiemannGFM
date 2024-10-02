@@ -14,7 +14,7 @@ np.random.seed(seed)
 parser = argparse.ArgumentParser(description='Geometric Graph Foundation Model')
 
 """Dataset settings"""
-parser.add_argument('--task', type=str, default='Pretrain',
+parser.add_argument('--task', type=str, default='NC',
                     choices=['NC', 'LP', 'GC', 'Pretrain'])
 parser.add_argument('--dataset', type=str, default='Cora',
                     help="['computers', 'photo', 'KarateClub', 'CS', 'Physics']")
@@ -29,7 +29,7 @@ parser.add_argument('--capacity', type=int, default=1000, help="Capacity of Cach
 
 """Checkpoints and logger"""
 parser.add_argument('--checkpoints', type=str, default='./checkpoints/')
-parser.add_argument('--pretrained_model_path', type=str)  # necessary
+parser.add_argument('--pretrained_model_path', type=str, help="Do not include .pt")  # necessary
 parser.add_argument('--task_model_path', type=str)  # necessary
 parser.add_argument('--log_dir', type=str, default='./logs/')
 parser.add_argument('--log_name', type=str)  # necessary
