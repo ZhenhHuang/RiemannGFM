@@ -61,5 +61,10 @@ class_maps = {
         7: 'scanner',
         8: 'printer',
         9: 'software'
+    },
+    "PubMed": {
+        0: "Tissue",
+        1: "Cell",
+        2: "Cancer"
     }
 }

@@ -21,6 +21,11 @@ class ZeroShotNC:
     def __init__(self, configs, load: bool = False):
         self.configs = configs
         self.load = load
+        self.logger = create_logger(self.configs.log_dir + self.configs.log_name)
+        if self.configs.use_gpu and torch.cuda.is_available():
+            self.device = torch.device('cuda')
+        else:
+            self.device = torch.device('cpu')
         self.load_word2vec()
         self.supp_sets = self.configs.supp_sets
         self.query_set = self.configs.query_set
@@ -33,19 +38,20 @@ class ZeroShotNC:
                                   hidden_dim=self.configs.hidden_dim, embed_dim=self.configs.embed_dim,
                                   bias=self.configs.bias,
                                   dropout=self.configs.dropout, activation=act_fn(self.configs.activation))
-        path = os.path.join(self.configs.checkpoints, self.configs.pretrained_model_path) + ".pt"
-        self.logger.info(f"---------------Loading pretrained models from {path}-------------")
-        pretrained_dict = torch.load(path)
-        model_dict = pretrained_model.state_dict()
-        model_dict.update(pretrained_dict)
-        pretrained_model.load_state_dict(model_dict)
+        if self.load:
+            path = os.path.join(self.configs.checkpoints, self.configs.pretrained_model_path) + ".pt"
+            self.logger.info(f"---------------Loading pretrained models from {path}-------------")
+            pretrained_dict = torch.load(path)
+            model_dict = pretrained_model.state_dict()
+            model_dict.update(pretrained_dict)
+            pretrained_model.load_state_dict(model_dict)
 
-        self.logger.info("----------Freezing weights-----------")
-        for module in pretrained_model.modules():
-            for param in module.parameters():
-                param.requires_grad = False
-        self.pretrained_model = pretrained_model.to(self.device)
-        self.nc_model = ShotNCHead(self.pretrained_model, self.class_embeddings, 3 * self.configs.embed_dim,
+            self.logger.info("----------Freezing weights-----------")
+            for module in pretrained_model.modules():
+                for param in module.parameters():
+                    param.requires_grad = False
+            pretrained_model = pretrained_model.to(self.device)
+        self.nc_model = ShotNCHead(pretrained_model, self.class_embeddings, 3 * self.configs.embed_dim,
                                100).to(self.device)
 
     def load_data(self, data_name):
@@ -70,15 +76,17 @@ class ZeroShotNC:
             load = True
             if i == 0:
                 load = False
+            self.logger.info(f"----------Pretraining on {data_name}--------------")
             self._train_step(load, data_name)
             torch.cuda.empty_cache()
+        self.test()
 
     def test(self):
-        data, test_loader = self.load_data("test")
+        data, test_loader = self.load_data(self.configs.query_set)
         tokens = train_node2vec(data, self.configs.embed_dim, self.device)
         self.nc_model.eval()
         self.logger.info("--------------Testing--------------------")
-        path = os.path.join(self.configs.checkpoints, self.configs.task_model_path)
+        path = os.path.join(self.configs.checkpoints, self.configs.pretrained_model_path_ZSL) + ".pt"
         self.logger.info(f"--------------Loading from {path}--------------------")
         self.nc_model.load_state_dict(torch.load(path))
         total = 0
@@ -109,7 +117,7 @@ class ZeroShotNC:
 
         tokens = train_node2vec(data, self.configs.embed_dim, self.device)
 
-        optimizer = Adam(self.model.parameters(), lr=self.configs.lr, weight_decay=self.configs.weight_decay)
+        optimizer = Adam(self.nc_model.parameters(), lr=self.configs.lr, weight_decay=self.configs.weight_decay)
         for epoch in range(self.configs.pretrain_epochs):
             epoch_loss = []
             total = 0
@@ -131,9 +139,9 @@ class ZeroShotNC:
             train_acc = (matches / total).item()
             self.logger.info(f"Epoch {epoch}: train_loss={train_loss}, train_acc={train_acc * 100: .2f}%")
             self.logger.info(f"---------------Saving pretrained models to {path}_{epoch}.pt-------------")
-            torch.save(self.model.state_dict(), path + f"_{epoch}.pt")  # save epoch every
+            torch.save(self.nc_model.state_dict(), path + f"_{epoch}.pt")  # save epoch every
             self.logger.info(f"---------------Saving pretrained models to {path}_{epoch}.pt-------------")
-            torch.save(self.model.state_dict(), path + f".pt")  # save for next training
+            torch.save(self.nc_model.state_dict(), path + f".pt")  # save for next training
 
     def load_word2vec(self, word2vec_path='glove-wiki-gigaword-100'):
         self.word2vec = api.load(word2vec_path)

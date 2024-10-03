@@ -80,13 +80,14 @@ class Pretrain:
     def pretrain(self, first_load=False, start_data=None):
         if not isinstance(self.configs.pretrain_dataset, list):
             self.configs.pretrain_dataset = [self.configs.pretrain_dataset]
-        for i, data_name in enumerate(self.configs.pretrain_dataset):
-            if start_data is not None:
-                if data_name != start_data:
-                    continue
-            load = True
-            self.logger.info(f"----------Pretraining on {data_name}--------------")
-            if i == 0:
-                load = first_load
-            self._train(load, data_name)
-            torch.cuda.empty_cache()
+        for e in range(10):
+            for i, data_name in enumerate(self.configs.pretrain_dataset):
+                if start_data is not None and e == 0:
+                    if data_name != start_data:
+                        continue
+                load = True
+                self.logger.info(f"----------Pretraining on {data_name}--------------")
+                if i == 0 and e == 0:
+                    load = first_load
+                self._train(load, data_name)
+                torch.cuda.empty_cache()
