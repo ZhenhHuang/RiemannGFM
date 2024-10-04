@@ -4,8 +4,7 @@ import torch.nn.functional as F
 import torch.nn as nn
 from modules.layers import EuclideanEncoder, ManifoldEncoder
 from modules.basics import HyperbolicStructureLearner, SphericalStructureLearner
-from manifolds import Euclidean, Lorentz, Sphere, ProductSpace
-from torch_scatter import scatter_mean, scatter_sum
+from manifolds import Lorentz, Sphere, ProductSpace
 
 
 class GeoGFM(nn.Module):
@@ -38,18 +37,14 @@ class GeoGFM(nn.Module):
             x_E, x_H, x_S = block((x_E, x_H, x_S), data)
         return x_E, x_H, x_S
 
-    def loss(self, x_tuple, data):
+    def loss(self, x_tuple):
         """
 
         :param x_tuple: (x_E, x_H, x_S)
-        :param data:
         :return:
         """
 
         x_E, x_H, x_S = x_tuple
-        # x_E = E[:data.batch_size]
-        # x_H = H[:data.batch_size]
-        # x_S = S[:data.batch_size]
 
         H_E = self.manifold_H.proju(x_H, x_E)
         S_E = self.manifold_H.proju(x_S, x_E)
@@ -96,9 +91,7 @@ class InitBlock(nn.Module):
         :param edge_index: edges
         :return: (E, H, S) Manifold initial representations
         """
-        E = self.Euc_init(tokens, edge_index)
-        # y = torch.ones_like(E) + torch.arange(E.shape[0], device=E.device).unsqueeze(-1) / E.shape[0]
-        # y = E
+        E = self.Euc_init(tokens)
         H = self.Hyp_init(tokens, edge_index)
         S = self.Sph_init(tokens, edge_index)
         return E, H, S
@@ -155,15 +148,3 @@ class EpsNet(nn.Module):
         z = torch.concat([x, y], dim=-1)
         z = F.relu(self.lin2(self.drop(z)))
         return z.squeeze(-1)
-
-
-# if __name__ == '__main__':
-#     from data.graph_exacters import graph_exacter
-#     from torch_geometric.datasets import KarateClub
-#     dataset = KarateClub()
-#     data = dataset.get(0)
-#     data_dict = {}
-#     for i in range(2):
-#         data_dict[i + 1] = graph_exacter(data, k_hop=i + 1)
-#     model = GeoGFM(2, 34, 5, True, F.relu, 0.)
-#     y = model(data.x, data_dict)

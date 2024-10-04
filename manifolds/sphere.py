@@ -1,7 +1,7 @@
 from typing import Union, Tuple, Optional
 import geoopt
 import torch
-from utils.math_utils import sin_div, cos_div_square, sin_div_cube
+from utils.math_utils import sin_div
 from geoopt.manifolds.stereographic.math import geodesic
 from torch_scatter import scatter_sum
 
@@ -91,30 +91,3 @@ class Sphere(geoopt.Sphere):
                 + mean
         )
         return geoopt.ManifoldTensor(self.expmap0(tens), manifold=self)
-
-
-    def jacobian_expmap_v(self, x, v):
-        v_norm = torch.norm(v, keepdim=True, dim=-1)  # (N, 1)
-        # print(f"v_norm: {v_norm.min(), v_norm.max()}")
-        eye = torch.eye(x.shape[1], device=x.device).unsqueeze(0)
-        first_term = sin_div(v_norm).unsqueeze(-1) * (eye - x.unsqueeze(-1) @ v.unsqueeze(1))
-        second_term = (cos_div_square(v_norm) - sin_div_cube(v_norm)).unsqueeze(-1) * v.unsqueeze(-1) @ v.unsqueeze(1)
-        # print(f"first_term: {first_term.max()}, second_term: {second_term.max()}")
-        return first_term + second_term
-
-    def jacobian_expmap_x(self, x, v):
-        u = torch.sum(v ** 2, dim=-1, keepdim=True).clamp(min=1e-4).sqrt()  # (N, 1)
-        eye = torch.eye(x.shape[1], device=x.device).unsqueeze(0)
-        return torch.cos(u).unsqueeze(-1) * eye
-
-
-if __name__ == '__main__':
-    from torch.autograd.functional import jacobian
-    def func(x, v):
-        m = Sphere()
-        return m.expmap(x, v)
-    x, v = torch.tensor([[1., 0., 0.]]), torch.tensor([[0., 0., 2.]])
-    j = jacobian(func, (x, v))[1]
-    jv = Sphere().jacobian_expmap_v(x, v)
-    print(j, j.shape)
-    print(jv, jv.shape)

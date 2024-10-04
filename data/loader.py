@@ -3,7 +3,6 @@ from torch_geometric.data import Data, Batch
 from torch_geometric.loader import NeighborLoader, LinkNeighborLoader
 from typing import Union, List, Optional, Callable
 from torch_geometric.utils import add_self_loops, to_networkx, from_networkx
-from data.graph_exacters import hierarchical_exacter
 from collections import OrderedDict
 import networkx as nx
 
@@ -48,7 +47,6 @@ class ExtractNodeLoader(NeighborLoader):
                     tG.add_edges_from(sorted_edges)
                     tree_edge_index = from_networkx(tG).edge_index
                     del tG
-                    # tree_edge_index = hierarchical_exacter(subset, sub_edge_index, torch.tensor([m]).long(), flow='source_to_target')
                     tree_list.append(Data(edge_index=tree_edge_index, num_nodes=subset.shape[0], seed_node=seed_node))
                 batch_tree = Batch.from_data_list(tree_list)
                 data.batch_tree = batch_tree
@@ -102,7 +100,6 @@ class ExtractLinkLoader(LinkNeighborLoader):
                     tG.add_edges_from(sorted_edges)
                     tree_edge_index = from_networkx(tG).edge_index
                     del tG
-                    # tree_edge_index = hierarchical_exacter(subset, sub_edge_index, torch.tensor([m]).long(), flow='source_to_target')
                     tree_list.append(Data(edge_index=tree_edge_index, num_nodes=subset.shape[0], seed_node=seed_node))
                 batch_tree = Batch.from_data_list(tree_list)
                 data.batch_tree = batch_tree

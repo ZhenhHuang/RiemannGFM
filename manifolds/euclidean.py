@@ -40,9 +40,3 @@ class Euclidean(geoopt.manifolds.Euclidean):
 
     def norm(self, u: torch.Tensor, x: torch.Tensor=None, *, keepdim=False):
         return torch.norm(u, dim=-1, keepdim=keepdim)
-
-    def jacobian_expmap_v(self, x, v):
-        return torch.eye(v.shape[1], device=v.device).unsqueeze(0)
-
-    def jacobian_expmap_x(self, x, v):
-        return torch.eye(x.shape[1], device=x.device).unsqueeze(0)

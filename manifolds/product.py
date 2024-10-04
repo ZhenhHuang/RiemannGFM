@@ -51,27 +51,3 @@ class ProductSpace(geoopt.ProductManifold):
             mid = mid.reshape((*mid.shape[:target_batch_dim], -1))
             mid_tensors.append(mid)
         return torch.cat(mid_tensors, -1)
-
-    def jacobian_expmap_v(self, x, v):
-        jacobs = torch.zeros((x.shape[0], x.shape[1], x.shape[1])).to(x.device)
-        index = 0
-        for i, manifold in enumerate(self.manifolds):
-            point = self.take_submanifold_value(x, i)
-            tangent = self.take_submanifold_value(v, i)
-            jacob = manifold.jacobian_expmap_v(point, tangent)
-            size = point.shape[-1]
-            jacobs[:, index: index + size, index: index + size] = jacob
-            index += size
-        return jacobs
-
-    def jacobian_expmap_x(self, x, v):
-        jacobs = torch.zeros((x.shape[0], x.shape[1], x.shape[1])).to(x.device)
-        index = 0
-        for i, manifold in enumerate(self.manifolds):
-            point = self.take_submanifold_value(x, i)
-            tangent = self.take_submanifold_value(v, i)
-            jacob = manifold.jacobian_expmap_x(point, tangent)
-            size = point.shape[-1]
-            jacobs[:, index: index + size, index: index + size] = jacob
-            index += size
-        return jacobs

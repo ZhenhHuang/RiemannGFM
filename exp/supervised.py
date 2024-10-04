@@ -35,7 +35,6 @@ class SupervisedExp:
 
                 pretrained_dict = torch.load(path)
                 model_dict = pretrained_model.state_dict()
-                # pretrained_dict = {k: v for k, v in pretrained_dict.items() if 'Euc_init' not in k}
                 model_dict.update(pretrained_dict)
                 pretrained_model.load_state_dict(model_dict)
 
@@ -100,7 +99,7 @@ class NodeClassification(SupervisedExp):
         for t in range(self.configs.exp_iters):
             self.nc_model = self.load_model()
             self.nc_model.train()
-            optimizer = RiemannianAdam(self.nc_model.parameters(), lr=self.configs.lr_nc,
+            optimizer = Adam(self.nc_model.parameters(), lr=self.configs.lr_nc,
                                        weight_decay=self.configs.weight_decay_nc)
             self.tokens = train_node2vec(dataset[0], self.configs.embed_dim, self.device)
             early_stop = EarlyStopping(self.configs.patience)

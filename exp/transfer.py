@@ -4,16 +4,13 @@ import torch.nn as nn
 from torch.optim import Adam
 import numpy as np
 from modules import *
-from gensim.models import Word2Vec
 import gensim.downloader as api
 from utils.train_utils import EarlyStopping, act_fn, train_node2vec
-from utils.data_utils import label2node
 from utils.logger import create_logger
 from data import load_data, input_dim_dict, ExtractNodeLoader
 from data.mappings import class_maps
 import os
 from tqdm import tqdm
-from exp.supervised import NodeClassification
 import re
 
 

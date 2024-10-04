@@ -34,7 +34,6 @@ class NodeClsHead(nn.Module):
         """
         super(NodeClsHead, self).__init__()
         self.pretrained_model = pretrained_model
-        # self.head = GCNConv(in_dim, num_cls, bias=False)
         self.head = GCN(2, in_dim, 32, num_cls, drop_edge=0.5, drop_feats=0.2)
     
     def forward(self, data):

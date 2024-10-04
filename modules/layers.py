@@ -16,19 +16,14 @@ class EuclideanEncoder(nn.Module):
     """
     def __init__(self, in_dim, hidden_dim, out_dim, bias=True, activation=F.relu, dropout=0.1):
         super().__init__()
-        # self.lin = GCNConv(in_dim, out_dim, bias=bias)
         self.lin = nn.Linear(in_dim, hidden_dim, bias=bias)
         self.activation = F.relu
         self.proj = nn.Linear(hidden_dim, out_dim, bias=bias)
         self.drop = dropout
-        # self.res_lin = nn.Linear(in_dim, out_dim, bias=bias)
 
-    def forward(self, x, edge_index):
-        # x_res = x.clone()
+    def forward(self, x):
         x = self.activation(self.lin(x))
         x = self.proj(F.dropout(x, p=self.drop, training=self.training))
-        # x = self.lin(x, edge_index)
-        # x = self.res_lin(x_res) + x
         return x
 
 
@@ -38,15 +33,11 @@ class ManifoldEncoder(nn.Module):
         self.manifold = manifold
         self.lin = ConstCurveLinear(manifold, in_dim, out_dim, bias=bias, dropout=dropout, activation=activation)
         self.agg = ConstCurveAgg(manifold, out_dim, dropout, use_att=False)
-        # self.proj = ConstCurveLinear(manifold, hidden_dim, out_dim, bias=bias, dropout=dropout, activation=activation)
 
     def forward(self, x, edge_index):
-        # o = torch.zeros_like(x).to(x.device)
-        # x = torch.cat([o[:, 0:1], x], dim=1)
         x = self.manifold.expmap0(x)
         x = self.lin(x)
         x = self.agg(x, edge_index)
-        # x = self.proj(x)
         return x
 
 

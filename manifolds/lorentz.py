@@ -1,7 +1,7 @@
 import geoopt
 import torch
 import geoopt.manifolds.lorentz.math as lmath
-from utils.math_utils import sinh_div, cosh_div_square, sinh_div_cube, arcosh, cosh, sinh
+from utils.math_utils import sinh_div, arcosh, cosh, sinh
 from torch_scatter import scatter_sum
 
 
@@ -73,29 +73,3 @@ class Lorentz(geoopt.Lorentz):
         theta = torch.clamp(x[:, 0:1] / sqrtK, min=1.0 + EPS[x.dtype])
         res[:, 1:] = sqrtK * arcosh(theta) * y / y_norm
         return res
-
-    def jacobian_expmap_v(self, x, v):
-        v_norm = self.norm(v, keepdim=True)  # (N, 1)
-        v_hat = v.clone()
-        v_hat.narrow(-1, 0, 1).mul_(-1)  # (N, D)
-        eye = torch.eye(x.shape[1], device=x.device).unsqueeze(0)
-        first_term = sinh_div(v_norm).unsqueeze(-1) * (eye + x.unsqueeze(-1) @ v_hat.unsqueeze(1))
-        second_term = (cosh_div_square(v_norm) - sinh_div_cube(v_norm)).unsqueeze(-1) * v.unsqueeze(-1) @ v_hat.unsqueeze(1)
-        return first_term + second_term
-
-    def jacobian_expmap_x(self, x, v):
-        u = self.norm(v, keepdim=True)  # (N, 1)
-        eye = torch.eye(x.shape[1], device=x.device).unsqueeze(0)
-        return torch.cosh(u).unsqueeze(-1) * eye
-
-
-if __name__ == '__main__':
-    from torch.autograd.functional import jacobian
-    def func(x, v):
-        m = Lorentz()
-        return m.expmap(x, v)
-    x, v = torch.tensor([[2., 1., 1., 1.]]), torch.tensor([[1., 0., 0., 2.]])
-    j = jacobian(func, (x, v))[1]
-    jv = Lorentz().jacobian_expmap_v(x, v)
-    print(j, j.shape)
-    print(jv, jv.shape)

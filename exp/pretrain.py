@@ -64,7 +64,7 @@ class Pretrain:
                 data = data.to(self.device)
                 data.tokens = tokens(data.n_id)
                 output = self.model(data)
-                loss = self.model.loss(output, data)
+                loss = self.model.loss(output)
                 if torch.isnan(loss).item():
                     continue
                 loss.backward()
