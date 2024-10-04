@@ -14,7 +14,7 @@ from tqdm import tqdm
 import re
 
 
-class ZeroShotNC:
+class FewShotNC:
     def __init__(self, configs, load: bool = False):
         self.configs = configs
         self.load = load
@@ -29,6 +29,7 @@ class ZeroShotNC:
         supp_embed_dict, query_embed_dict = self.get_class_embedding(self.supp_sets, self.query_set)
         self.merge_embeddings(supp_embed_dict, query_embed_dict)
         self.load_model()
+        self.k_shot = self.configs.k_shot
 
     def load_model(self):
         pretrained_model = GeoGFM(n_layers=self.configs.n_layers, in_dim=self.configs.embed_dim,
@@ -51,14 +52,32 @@ class ZeroShotNC:
         self.nc_model = ShotNCHead(pretrained_model, self.class_embeddings, 3 * self.configs.embed_dim,
                                100).to(self.device)
 
-    def load_data(self, data_name):
+    def load_data(self, data_name, finetune=False):
+        """
+
+        :param data_name: name of dataset
+        :param finetune: use for k-shot fine-tuning
+        :return: Data and Dataloader
+        """
+        if self.k_shot == 0:
+            num_per_class = None
+        else:
+            num_per_class = self.k_shot
         if data_name == self.query_set:
-            dataset = load_data(root=self.configs.root_path, data_name=self.query_set)
-            data = self.convert_label(dataset[0].clone(), self.query_set)
-            query_loader = ExtractNodeLoader(data, input_nodes=data.train_mask, batch_size=self.configs.batch_size,
-                                            num_neighbors=self.configs.num_neighbors,
-                                            capacity=self.configs.capacity)
+            if finetune:
+                dataset = load_data(root=self.configs.root_path, data_name=self.query_set, num_per_class=num_per_class)
+                data = self.convert_label(dataset[0].clone(), self.query_set)
+                query_loader = ExtractNodeLoader(data, input_nodes=data.train_mask, batch_size=self.configs.batch_size,
+                                                 num_neighbors=self.configs.num_neighbors,
+                                                 capacity=self.configs.capacity)
+            else:
+                dataset = load_data(root=self.configs.root_path, data_name=self.query_set)
+                data = self.convert_label(dataset[0].clone(), self.query_set)
+                query_loader = ExtractNodeLoader(data, input_nodes=data.test_mask, batch_size=self.configs.batch_size,
+                                                num_neighbors=self.configs.num_neighbors,
+                                                capacity=self.configs.capacity)
             return data, query_loader
+
         dataset = load_data(root=self.configs.root_path, data_name=data_name)
         data = self.convert_label(dataset[0].clone(), data_name)
         dataloader = ExtractNodeLoader(data, batch_size=self.configs.batch_size,
@@ -66,16 +85,22 @@ class ZeroShotNC:
                                        capacity=self.configs.capacity)
         return data, dataloader
 
-    def train(self):
-        if not isinstance(self.configs.supp_sets, list):
-            self.configs.supp_sets = [self.configs.supp_sets]
-        for i, data_name in enumerate(self.supp_sets):
-            load = True
-            if i == 0:
-                load = False
-            self.logger.info(f"----------Pretraining on {data_name}--------------")
-            self._train_step(load, data_name)
-            torch.cuda.empty_cache()
+    def train(self, skip_pretrain=False):
+        if skip_pretrain is False:
+            if not isinstance(self.configs.supp_sets, list):
+                self.configs.supp_sets = [self.configs.supp_sets]
+            for i, data_name in enumerate(self.supp_sets):
+                load = True
+                if i == 0:
+                    load = False
+                self.logger.info(f"----------Pretraining on {data_name}--------------")
+                self._train_step(load, data_name, self.configs.pretrain_epochs, self.configs.lr)
+                torch.cuda.empty_cache()
+        if self.k_shot > 0:
+            self.logger.info(f"----------Fine-tuning on {self.query_set}---------")
+            self._train_step(load=True, data_name=self.query_set,
+                             train_epochs=self.configs.shot_epochs, finetune=True,
+                             lr=self.configs.lr_few_nc)
         self.test()
 
     def test(self):
@@ -83,7 +108,7 @@ class ZeroShotNC:
         tokens = train_node2vec(data, self.configs.embed_dim, self.device)
         self.nc_model.eval()
         self.logger.info("--------------Testing--------------------")
-        path = os.path.join(self.configs.checkpoints, self.configs.pretrained_model_path_ZSL) + ".pt"
+        path = os.path.join(self.configs.checkpoints, self.configs.pretrained_model_path_FSL) + ".pt"
         self.logger.info(f"--------------Loading from {path}--------------------")
         self.nc_model.load_state_dict(torch.load(path))
         total = 0
@@ -100,22 +125,22 @@ class ZeroShotNC:
         self.logger.info(f"test_acc={test_acc * 100: .2f}%")
         return test_acc
 
-    def _train_step(self, load, data_name):
+    def _train_step(self, load, data_name, train_epochs, lr, finetune=False):
         if load:
-            load_path = os.path.join(self.configs.checkpoints, self.configs.pretrained_model_path_ZSL) + f".pt"
+            load_path = os.path.join(self.configs.checkpoints, self.configs.pretrained_model_path_FSL) + f".pt"
             self.logger.info(f"---------------Loading pretrained models from {load_path}-------------")
             pretrained_dict = torch.load(load_path)
             model_dict = self.nc_model.state_dict()
             model_dict.update(pretrained_dict)
             self.nc_model.load_state_dict(model_dict)
 
-        path = os.path.join(self.configs.checkpoints, self.configs.pretrained_model_path_ZSL)
-        data, dataloader = self.load_data(data_name)
+        path = os.path.join(self.configs.checkpoints, self.configs.pretrained_model_path_FSL)
+        data, dataloader = self.load_data(data_name, finetune=finetune)
 
         tokens = train_node2vec(data, self.configs.embed_dim, self.device)
 
-        optimizer = Adam(self.nc_model.parameters(), lr=self.configs.lr, weight_decay=self.configs.weight_decay)
-        for epoch in range(self.configs.pretrain_epochs):
+        optimizer = Adam(self.nc_model.parameters(), lr=lr, weight_decay=self.configs.weight_decay)
+        for epoch in range(train_epochs):
             epoch_loss = []
             total = 0
             matches = 0
@@ -135,9 +160,9 @@ class ZeroShotNC:
             train_loss = np.mean(epoch_loss)
             train_acc = (matches / total).item()
             self.logger.info(f"Epoch {epoch}: train_loss={train_loss}, train_acc={train_acc * 100: .2f}%")
-            self.logger.info(f"---------------Saving pretrained models to {path}_{epoch}.pt-------------")
-            torch.save(self.nc_model.state_dict(), path + f"_{epoch}.pt")  # save epoch every
-            self.logger.info(f"---------------Saving pretrained models to {path}_{epoch}.pt-------------")
+            # self.logger.info(f"---------------Saving pretrained models to {path}_{epoch}.pt-------------")
+            # torch.save(self.nc_model.state_dict(), path + f"_{epoch}.pt")  # save epoch every
+            self.logger.info(f"---------------Saving pretrained models to {path}.pt-------------")
             torch.save(self.nc_model.state_dict(), path + f".pt")  # save for next training
 
     def load_word2vec(self, word2vec_path='glove-wiki-gigaword-100'):

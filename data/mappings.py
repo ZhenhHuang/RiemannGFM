@@ -1,3 +1,4 @@
+
 class_maps = {
     "Cora": {
         0: 'Case-Based',
@@ -7,6 +8,14 @@ class_maps = {
         4: 'Reinforcement Learning',
         5: 'Rule Learning',
         6: 'Theory'
+    },
+    "Citeseer": {
+        0: "Agents",
+        1: "Artificial Intelligence",
+        2: "Databases",
+        3: "Information Retrieval",
+        4: "Machine Learning",
+        5: "Human-Computer Interaction"
     },
     "ogbn-arxiv": {
         0: 'cs.AI',
@@ -66,5 +75,9 @@ class_maps = {
         0: "Tissue",
         1: "Cell",
         2: "Cancer"
+    },
+    "GitHub": {
+        0: "Web Developer",
+        1: "Machine Learning Developer"
     }
 }

@@ -14,7 +14,7 @@ class_num_dict = {"KarateClub": 4, "Cora": 7, "Citeseer": 6, "PubMed": 3, "ogbn-
                   "GitHub": 2, "USA": 4, "computers": 10, "Flickr": 7}
 
 
-def load_data(root: str, data_name: str, split='public', num_val=0.1, num_test=0.2) -> Dataset:
+def load_data(root: str, data_name: str, split='public', num_val=0.1, num_test=0.2, num_per_class=None) -> Dataset:
     if data_name in ["computers", "photo"]:
         dataset = Amazon(root, name=data_name, transform=RandomNodeSplit(num_val=num_val, num_test=num_test))
     elif data_name == "KarateClub":
@@ -22,13 +22,23 @@ def load_data(root: str, data_name: str, split='public', num_val=0.1, num_test=0
     elif data_name in ["CS", "Physics"]:
         dataset = Coauthor(root, name=data_name, transform=RandomNodeSplit(num_val=0.2, num_test=0.3))
     elif data_name in ['Cora', 'Citeseer', 'PubMed']:
-        dataset = Planetoid(root, name=data_name, split=split)
+        if num_per_class is None:
+            num_per_class = 20
+        dataset = Planetoid(root, name=data_name, split=split, num_train_per_class=num_per_class)
     elif data_name == 'ogbn-arxiv':
         dataset = PygNodePropPredDataset(name=data_name, root=root, transform=RandomNodeSplit(num_val=0.2, num_test=0.3))
     elif data_name == 'GitHub':
-        dataset = GitHub(os.path.join(root, "GitHub"), transform=RandomNodeSplit(num_val=0.1, num_test=0.2))
+        if num_per_class is None:
+            transform = RandomNodeSplit(num_val=0.1, num_test=0.2)
+        else:
+            transform = RandomNodeSplit(num_val=0.1, num_test=0.2, num_train_per_class=num_per_class)
+        dataset = GitHub(os.path.join(root, "GitHub"), transform=transform)
     elif data_name in ["USA", "Brazil", "Europe"]:
-        dataset = Airports(root, data_name, transform=RandomNodeSplit(num_val=0.1, num_test=0.2))
+        if num_per_class is None:
+            transform = RandomNodeSplit(num_val=0.1, num_test=0.2)
+        else:
+            transform = RandomNodeSplit(num_val=0.1, num_test=0.2, num_train_per_class=num_per_class)
+        dataset = Airports(root, data_name, transform=transform)
     elif data_name == 'Flickr':
         dataset = Flickr(os.path.join(root, "Flickr"))
     elif data_name == 'Reddit':

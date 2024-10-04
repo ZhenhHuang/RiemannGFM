@@ -14,15 +14,15 @@ np.random.seed(seed)
 parser = argparse.ArgumentParser(description='Geometric Graph Foundation Model')
 
 """Dataset settings"""
-parser.add_argument('--task', type=str, default='0NC',
-                    choices=['NC', 'LP', 'GC', 'Pretrain', '0NC'])
+parser.add_argument('--task', type=str, default='Few-NC',
+                    choices=['NC', 'LP', 'GC', 'Pretrain', 'Few-NC'])
 parser.add_argument('--dataset', type=str, default='PubMed',
                     help="['computers', 'photo', 'KarateClub', 'CS', 'Physics']")
 parser.add_argument('--pretrain_dataset', nargs="+", type=str,
-                    default=['Flickr', 'ogbn-arxiv', 'computers'])
+                    default=['ogbn-arxiv', 'computers', 'Physics'])
 parser.add_argument('--supp_sets', nargs="+", type=str,
                     default=['PubMed'])
-parser.add_argument('--query_set', type=str, default='Cora')
+parser.add_argument('--query_set', type=str, default='Citeseer')
 parser.add_argument('--root_path', type=str, default='D:\datasets\Graphs')
 parser.add_argument('--num_neighbors', type=int, nargs="+", default=[20, 10],
                     help="Number of neighbors of data_loaders")
@@ -60,8 +60,11 @@ parser.add_argument('--pretrain_epochs', type=int, default=10)
 parser.add_argument('--lr', type=float, default=0.01)
 parser.add_argument('--weight_decay', type=float, default=0.0)
 
-# Zero-Shot Learning
-parser.add_argument('--pretrained_model_path_ZSL', type=str, default="./pretrained_models")
+# Few-Shot Learning
+parser.add_argument('--pretrained_model_path_FSL', type=str, default="./pretrained_models")
+parser.add_argument('--k_shot', type=int, default=5, choices=[0, 1, 5])
+parser.add_argument('--shot_epochs', type=int, default=60)
+parser.add_argument('--lr_few_nc', type=float, default=1e-2)
 
 # Node classification
 parser.add_argument('--nc_epochs', type=int, default=120)
@@ -110,10 +113,9 @@ elif configs.task == 'NC':
 elif configs.task == 'LP':
     exp = LinkPrediction(configs, load=True, finetune=True)
     exp.train()
-elif configs.task == '0NC':
-    exp = ZeroShotNC(configs, load=False)
-    exp.train()
-    # exp.test()
+elif configs.task == 'Few-NC':
+    exp = FewShotNC(configs, load=False)
+    exp.train(skip_pretrain=True)
 else:
     raise NotImplementedError
 
