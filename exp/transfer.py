@@ -7,7 +7,7 @@ from modules import *
 import gensim.downloader as api
 from utils.train_utils import EarlyStopping, act_fn
 from utils.logger import create_logger
-from data import load_data, input_dim_dict, ExtractNodeLoader
+from data import load_data, input_dim_dict, ExtractNodeLoader, get_eigen_tokens
 from data.mappings import class_maps
 import os
 from tqdm import tqdm
@@ -67,12 +67,14 @@ class FewShotNC:
             if finetune:
                 dataset = load_data(root=self.configs.root_path, data_name=self.query_set, num_per_class=num_per_class)
                 data = self.convert_label(dataset[0].clone(), self.query_set)
+                data.tokens = get_eigen_tokens(data, self.configs.embed_dim, self.device)
                 query_loader = ExtractNodeLoader(data, input_nodes=data.train_mask, batch_size=self.configs.batch_size,
                                                  num_neighbors=self.configs.num_neighbors,
                                                  capacity=self.configs.capacity)
             else:
                 dataset = load_data(root=self.configs.root_path, data_name=self.query_set)
                 data = self.convert_label(dataset[0].clone(), self.query_set)
+                data.tokens = get_eigen_tokens(data, self.configs.embed_dim, self.device)
                 query_loader = ExtractNodeLoader(data, input_nodes=data.test_mask, batch_size=self.configs.batch_size,
                                                 num_neighbors=self.configs.num_neighbors,
                                                 capacity=self.configs.capacity)
@@ -80,6 +82,7 @@ class FewShotNC:
 
         dataset = load_data(root=self.configs.root_path, data_name=data_name)
         data = self.convert_label(dataset[0].clone(), data_name)
+        data.tokens = get_eigen_tokens(data, self.configs.embed_dim, self.device)
         dataloader = ExtractNodeLoader(data, batch_size=self.configs.batch_size,
                                        num_neighbors=self.configs.num_neighbors,
                                        capacity=self.configs.capacity)

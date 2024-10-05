@@ -26,6 +26,7 @@ class Pretrain:
         if task_level == 'node':
             dataset = load_data(root=self.configs.root_path, data_name=data_name)
             data = dataset[0]
+            data.tokens = get_eigen_tokens(data, self.configs.embed_dim, self.device)
             dataloader = ExtractNodeLoader(data, batch_size=self.configs.batch_size,
                                            num_neighbors=self.configs.num_neighbors,
                                            capacity=self.configs.capacity)
