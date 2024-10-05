@@ -14,10 +14,10 @@ np.random.seed(seed)
 parser = argparse.ArgumentParser(description='Geometric Graph Foundation Model')
 
 """Dataset settings"""
-parser.add_argument('--task', type=str, default='Few-NC',
+parser.add_argument('--task', type=str, default='NC',
                     choices=['NC', 'LP', 'GC', 'Pretrain', 'Few-NC'])
-parser.add_argument('--dataset', type=str, default='PubMed',
-                    help="['computers', 'photo', 'KarateClub', 'CS', 'Physics']")
+parser.add_argument('--dataset', type=str, default='Citeseer',
+                    help="[Citesser, PubMed, GitHub, USA]")
 parser.add_argument('--pretrain_dataset', nargs="+", type=str,
                     default=['ogbn-arxiv', 'computers', 'Physics'])
 parser.add_argument('--supp_sets', nargs="+", type=str,
@@ -27,11 +27,13 @@ parser.add_argument('--root_path', type=str, default='D:\datasets\Graphs')
 parser.add_argument('--num_neighbors', type=int, nargs="+", default=[20, 10],
                     help="Number of neighbors of data_loaders")
 parser.add_argument('--batch_size', type=int, default=32)
-parser.add_argument('--capacity', type=int, default=1000, help="Capacity of Cache for dataloader")
+parser.add_argument('--capacity', type=int, default=100, help="Capacity of Cache for dataloader")
 
 """Checkpoints and logger"""
 parser.add_argument('--checkpoints', type=str, default='./checkpoints/')
-parser.add_argument('--pretrained_model_path', type=str, help="Do not include .pt")  # necessary
+parser.add_argument('--pretrained_model_path', type=str,
+                    default="eig_Pretrain_ogbn-arxiv_computers_Physics_model",
+                    help="Do not include .pt")  # necessary
 parser.add_argument('--task_model_path', type=str)  # necessary
 parser.add_argument('--log_dir', type=str, default='./logs/')
 parser.add_argument('--log_name', type=str)  # necessary
@@ -40,8 +42,8 @@ parser.add_argument('--log_name', type=str)  # necessary
 parser.add_argument('--n_layers', type=int, default=2)
 parser.add_argument('--bias', type=bool, default=True)
 parser.add_argument('--dropout', type=float, default=0.1)
-parser.add_argument('--embed_dim', type=int, default=16, help='Embedding dimension of Pretrained model')
-parser.add_argument('--hidden_dim', type=int, default=32)
+parser.add_argument('--embed_dim', type=int, default=32, help='Embedding dimension of Pretrained model')
+parser.add_argument('--hidden_dim', type=int, default=256)
 parser.add_argument('--activation', type=str, default=None)
 
 # LP head

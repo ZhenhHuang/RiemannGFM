@@ -6,9 +6,9 @@ from geoopt.optim import RiemannianAdam
 import numpy as np
 from modules import *
 from utils.train_utils import EarlyStopping, act_fn
-from utils.evall_utils import cal_accuracy, cal_AUC_AP
+from utils.evall_utils import cal_accuracy, cal_AUC_AP, cal_F1
 from utils.logger import create_logger
-from data import load_data, ExtractNodeLoader, ExtractLinkLoader, input_dim_dict, class_num_dict
+from data import *
 from torch_geometric.transforms import RandomLinkSplit
 import os
 from tqdm import tqdm
@@ -81,6 +81,7 @@ class NodeClassification(SupervisedExp):
         dataset = load_data(root=self.configs.root_path, data_name=self.configs.dataset,
                             device=self.device, embed_dim=self.configs.embed_dim)
         data = dataset[0]
+        data.tokens = get_eigen_tokens(data, self.configs.embed_dim, self.device)
         train_loader = ExtractNodeLoader(data, input_nodes=data.train_mask, batch_size=self.configs.batch_size,
                                    num_neighbors=self.configs.num_neighbors,
                                    capacity=self.configs.capacity)
@@ -97,6 +98,8 @@ class NodeClassification(SupervisedExp):
     def train(self):
         dataset, train_loader, val_loader, test_loader = self.load_data("train")
         total_test_acc = []
+        total_test_weighted_f1 = []
+        total_test_macro_f1 = []
         for t in range(self.configs.exp_iters):
             self.nc_model = self.load_model()
             self.nc_model.train()
@@ -105,57 +108,74 @@ class NodeClassification(SupervisedExp):
             early_stop = EarlyStopping(self.configs.patience)
             for epoch in range(self.configs.nc_epochs):
                 epoch_loss = []
-                total = 0
-                matches = 0
+                trues = []
+                preds = []
 
                 for data in tqdm(train_loader):
                     data = data.to(self.device)
-                    loss, correct, num = self.train_step(data, optimizer)
+                    loss, pred, true = self.train_step(data, optimizer)
                     epoch_loss.append(loss)
-                    matches += correct
-                    total += num
+                    trues.append(true)
+                    preds.append(pred)
+                trues = np.concatenate(trues, axis=-1)
+                preds = np.concatenate(preds, axis=-1)
 
                 train_loss = np.mean(epoch_loss)
-                train_acc = (matches / total).item()
+                train_acc = cal_accuracy(preds, trues)
 
                 self.logger.info(f"Epoch {epoch}: train_loss={train_loss}, train_acc={train_acc * 100: .2f}%")
 
                 if epoch % self.configs.val_every == 0:
-                    val_loss, val_acc = self.val(val_loader)
-                    self.logger.info(f"Epoch {epoch}: val_loss={val_loss}, val_acc={val_acc * 100: .2f}%")
+                    val_loss, val_acc, val_weighted_f1, val_macro_f1 = self.val(val_loader)
+                    self.logger.info(f"Epoch {epoch}: val_loss={val_loss}, "
+                                     f"val_acc={val_acc * 100: .2f}%,"
+                                     f"val_weighted_f1={val_weighted_f1 * 100: .2f},"
+                                     f"val_macro_f1={val_macro_f1 * 100: .2f}%")
                     early_stop(val_loss, self.nc_model, self.configs.checkpoints, self.configs.task_model_path)
                     if early_stop.early_stop:
                         print("---------Early stopping--------")
                         break
-            test_acc = self.test(test_loader)
-            self.logger.info(f"test_acc={test_acc * 100: .2f}%")
+            test_acc, weighted_f1, macro_f1 = self.test(test_loader)
+            self.logger.info(f"test_acc={test_acc * 100: .2f}%, "
+                             f"weighted_f1={weighted_f1 * 100: .2f},"
+                             f"macro_f1={macro_f1 * 100: .2f}%")
             total_test_acc.append(test_acc)
+            total_test_weighted_f1.append(weighted_f1)
+            total_test_macro_f1.append(macro_f1)
         mean, std = np.mean(total_test_acc), np.std(total_test_acc)
         self.logger.info(f"Evaluation Acc is {mean * 100: .2f}% +- {std * 100: .2f}%")
+        mean, std = np.mean(total_test_weighted_f1), np.std(total_test_weighted_f1)
+        self.logger.info(f"Evaluation weighted F1 is {mean * 100: .2f}% +- {std * 100: .2f}%")
+        mean, std = np.mean(total_test_macro_f1), np.std(total_test_macro_f1)
+        self.logger.info(f"Evaluation macro F1 is {mean * 100: .2f}% +- {std * 100: .2f}%")
 
     def train_step(self, data, optimizer):
         optimizer.zero_grad()
         out = self.nc_model(data)
-        loss, correct = self.cal_loss(out, data.y, data.batch_size)
+        loss, preds, trues = self.cal_loss(out, data.y, data.batch_size)
         loss.backward()
         optimizer.step()
-        return loss.item(), correct, data.batch_size
+        return loss.item(), preds, trues
 
     def val(self, val_loader):
         self.nc_model.eval()
         val_loss = []
-        total = 0
-        matches = 0
+        trues = []
+        preds = []
         with torch.no_grad():
             for data in val_loader:
                 data = data.to(self.device)
                 out = self.nc_model(data)
-                loss, correct = self.cal_loss(out, data.y, data.batch_size)
+                loss, pred, true = self.cal_loss(out, data.y, data.batch_size)
                 val_loss.append(loss.item())
-                matches += correct
-                total += data.batch_size
+                trues.append(true)
+                preds.append(pred)
+        trues = np.concatenate(trues, axis=-1)
+        preds = np.concatenate(preds, axis=-1)
+        acc = cal_accuracy(preds, trues)
+        weighted_f1, macro_f1 = cal_F1(preds, trues)
         self.nc_model.train()
-        return np.mean(val_loss), (matches / total).item()
+        return np.mean(val_loss), acc, weighted_f1, macro_f1
 
     def test(self, test_loader=None):
         test_loader = self.load_data("test") if test_loader is None else test_loader
@@ -164,25 +184,30 @@ class NodeClassification(SupervisedExp):
         path = os.path.join(self.configs.checkpoints, self.configs.task_model_path)
         self.logger.info(f"--------------Loading from {path}--------------------")
         self.nc_model.load_state_dict(torch.load(path))
-        total = 0
-        matches = 0
+        trues = []
+        preds = []
         with torch.no_grad():
             for data in test_loader:
                 data = data.to(self.device)
                 out = self.nc_model(data)
-                loss, correct = self.cal_loss(out, data.y, data.batch_size)
-                matches += correct
-                total += data.batch_size
-        test_acc = (matches / total).item()
-        self.logger.info(f"test_acc={test_acc * 100: .2f}%")
-        return test_acc
+                loss, pred, true = self.cal_loss(out, data.y, data.batch_size)
+                trues.append(true)
+                preds.append(pred)
+            trues = np.concatenate(trues, axis=-1)
+            preds = np.concatenate(preds, axis=-1)
+        test_acc = cal_accuracy(preds, trues)
+        weighted_f1, macro_f1 = cal_F1(preds, trues)
+        self.logger.info(f"test_acc={test_acc * 100: .2f}%, "
+                         f"weighted_f1={weighted_f1 * 100: .2f},"
+                         f"macro_f1={macro_f1 * 100: .2f}%")
+        return test_acc, weighted_f1, macro_f1
 
     def cal_loss(self, output, label, batch_size):
         out = output[:batch_size]
         y = label[:batch_size].reshape(-1)
         loss = F.cross_entropy(out, y)
-        correct = (out.argmax(dim=-1) == y).sum()
-        return loss, correct
+        pred = out.argmax(dim=-1).detach().cpu().numpy()
+        return loss, pred, y.detach().cpu().numpy()
 
 
 class LinkPrediction(SupervisedExp):

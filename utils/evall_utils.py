@@ -9,13 +9,11 @@ import random
 
 
 def cal_accuracy(preds, trues):
-    preds = np.argmax(preds, axis=-1)
     correct = (preds == trues).sum()
     return correct / len(trues)
 
 
 def cal_F1(preds, trues):
-    preds = np.argmax(preds, axis=-1)
     weighted_f1 = f1_score(trues, preds, average='weighted')
     macro_f1 = f1_score(trues, preds, average='macro')
     return weighted_f1, macro_f1
