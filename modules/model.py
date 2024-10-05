@@ -32,7 +32,7 @@ class GeoGFM(nn.Module):
         :return: z: node product representations
         """
         x = data.x.clone()
-        x_E, x_H, x_S = self.init_block(x, data.edge_index, data.tokens)  # [N, Hidden]
+        x_E, x_H, x_S = self.init_block(x, data.edge_index, data.tokens(data.n_id))  # [N, Hidden]
         for i, block in enumerate(self.blocks):
             x_E, x_H, x_S = block((x_E, x_H, x_S), data)
         return x_E, x_H, x_S

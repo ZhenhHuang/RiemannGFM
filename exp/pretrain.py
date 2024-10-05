@@ -4,7 +4,7 @@ import torch.nn as nn
 from torch.optim import Adam
 import numpy as np
 from modules import *
-from utils.train_utils import EarlyStopping, act_fn, train_node2vec
+from utils.train_utils import EarlyStopping, act_fn
 from utils.logger import create_logger
 from data import load_data, input_dim_dict, ExtractNodeLoader
 import os
@@ -21,7 +21,6 @@ class Pretrain:
         else:
             self.device = torch.device('cpu')
         self.build_model()
-        # self.data_name = self.configs.dataset
 
     def load_data(self, task_level, data_name):
         if task_level == 'node':
@@ -54,7 +53,6 @@ class Pretrain:
         path = os.path.join(self.configs.checkpoints, self.configs.pretrained_model_path)
         data, dataloader = self.load_data(self.configs.pretrain_level, data_name)
 
-        tokens = train_node2vec(data, self.configs.embed_dim, self.device)
 
         optimizer = Adam(self.model.parameters(), lr=self.configs.lr, weight_decay=self.configs.weight_decay)
         for epoch in range(self.configs.pretrain_epochs):
@@ -62,7 +60,6 @@ class Pretrain:
             for data in tqdm(dataloader):
                 optimizer.zero_grad()
                 data = data.to(self.device)
-                data.tokens = tokens(data.n_id)
                 output = self.model(data)
                 loss = self.model.loss(output)
                 if torch.isnan(loss).item():

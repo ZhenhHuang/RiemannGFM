@@ -5,7 +5,7 @@ from torch.optim import Adam, SparseAdam
 from geoopt.optim import RiemannianAdam
 import numpy as np
 from modules import *
-from utils.train_utils import EarlyStopping, act_fn, train_node2vec
+from utils.train_utils import EarlyStopping, act_fn
 from utils.evall_utils import cal_accuracy, cal_AUC_AP
 from utils.logger import create_logger
 from data import load_data, ExtractNodeLoader, ExtractLinkLoader, input_dim_dict, class_num_dict
@@ -78,7 +78,8 @@ class NodeClassification(SupervisedExp):
         return nc_model
 
     def load_data(self, split: str):
-        dataset = load_data(root=self.configs.root_path, data_name=self.configs.dataset)
+        dataset = load_data(root=self.configs.root_path, data_name=self.configs.dataset,
+                            device=self.device, embed_dim=self.configs.embed_dim)
         data = dataset[0]
         train_loader = ExtractNodeLoader(data, input_nodes=data.train_mask, batch_size=self.configs.batch_size,
                                    num_neighbors=self.configs.num_neighbors,
@@ -101,7 +102,6 @@ class NodeClassification(SupervisedExp):
             self.nc_model.train()
             optimizer = Adam(self.nc_model.parameters(), lr=self.configs.lr_nc,
                                        weight_decay=self.configs.weight_decay_nc)
-            self.tokens = train_node2vec(dataset[0], self.configs.embed_dim, self.device)
             early_stop = EarlyStopping(self.configs.patience)
             for epoch in range(self.configs.nc_epochs):
                 epoch_loss = []
@@ -110,7 +110,6 @@ class NodeClassification(SupervisedExp):
 
                 for data in tqdm(train_loader):
                     data = data.to(self.device)
-                    data.tokens = self.tokens(data.n_id)
                     loss, correct, num = self.train_step(data, optimizer)
                     epoch_loss.append(loss)
                     matches += correct
@@ -150,7 +149,6 @@ class NodeClassification(SupervisedExp):
         with torch.no_grad():
             for data in val_loader:
                 data = data.to(self.device)
-                data.tokens = self.tokens(data.n_id)
                 out = self.nc_model(data)
                 loss, correct = self.cal_loss(out, data.y, data.batch_size)
                 val_loss.append(loss.item())
@@ -171,7 +169,6 @@ class NodeClassification(SupervisedExp):
         with torch.no_grad():
             for data in test_loader:
                 data = data.to(self.device)
-                data.tokens = self.tokens(data.n_id)
                 out = self.nc_model(data)
                 loss, correct = self.cal_loss(out, data.y, data.batch_size)
                 matches += correct
@@ -194,9 +191,13 @@ class LinkPrediction(SupervisedExp):
         self.lp_model = self.load_model()
 
     def load_data(self, split):
-        dataset = load_data(root=self.configs.root_path, data_name=self.configs.dataset)
+        dataset = load_data(root=self.configs.root_path, data_name=self.configs.dataset,
+                            device=self.device, embed_dim=self.configs.embed_dim)
         train_data, val_data, test_data = RandomLinkSplit(is_undirected=False,
                                                           add_negative_train_samples=False)(dataset[0])
+        train_data.tokens = get_eigen_tokens(train_data, self.configs.embed_dim, self.device)
+        val_data.tokens = get_eigen_tokens(train_data, self.configs.embed_dim, self.device)
+        test_data.tokens = get_eigen_tokens(train_data, self.configs.embed_dim, self.device)
         train_loader = ExtractLinkLoader(train_data, batch_size=self.configs.batch_size,
                                    num_neighbors=self.configs.num_neighbors,
                                          neg_sampling_ratio=2.0,
@@ -215,7 +216,7 @@ class LinkPrediction(SupervisedExp):
 
     def load_model(self):
         lp_model = LinkPredHead(self.pretrained_model,
-                                3 * self.configs.embed_dim,
+                                2 * self.configs.embed_dim + input_dim_dict[self.configs.dataset],
                                 self.configs.embed_dim_lp).to(self.device)
         return lp_model
 
@@ -227,8 +228,6 @@ class LinkPrediction(SupervisedExp):
             self.lp_model.train()
             optimizer = Adam(self.lp_model.parameters(), lr=self.configs.lr_lp,
                              weight_decay=self.configs.weight_decay_lp)
-            tokens = train_node2vec(train_data, self.configs.embed_dim, self.device)
-            self.tokens = tokens
             early_stop = EarlyStopping(self.configs.patience)
             for epoch in range(self.configs.lp_epochs):
                 epoch_loss = []
@@ -237,7 +236,6 @@ class LinkPrediction(SupervisedExp):
 
                 for data in tqdm(train_loader):
                     data = data.to(self.device)
-                    data.tokens = tokens(data.n_id)
                     loss, pred, label = self.train_step(data, optimizer)
                     epoch_loss.append(loss)
                     epoch_label.append(label)
@@ -285,7 +283,6 @@ class LinkPrediction(SupervisedExp):
         with torch.no_grad():
             for data in val_loader:
                 data = data.to(self.device)
-                data.tokens = self.tokens(data.n_id)
                 pred, label = self.lp_model(data)
                 loss = F.binary_cross_entropy_with_logits(pred, label)
                 val_loss.append(loss.item())
@@ -310,7 +307,6 @@ class LinkPrediction(SupervisedExp):
         with torch.no_grad():
             for data in test_loader:
                 data = data.to(self.device)
-                data.tokens = self.tokens(data.n_id)
                 pred, label = self.lp_model(data)
                 test_label.append(label)
                 test_pred.append(pred)

@@ -3,8 +3,11 @@ import numpy as np
 from torch_geometric.data import Dataset, Data
 from torch_geometric.datasets import (Amazon, Coauthor, KarateClub, Planetoid,
                                       GitHub, Airports, Flickr, Reddit, PolBlogs)
-from torch_geometric.transforms import RandomNodeSplit, RandomLinkSplit
+from torch_geometric.transforms import RandomNodeSplit
 from ogb.nodeproppred import PygNodePropPredDataset
+from torch_geometric.utils import get_laplacian
+from scipy.sparse import csr_matrix
+from scipy.sparse.linalg import eigs
 import os
 
 
@@ -14,7 +17,9 @@ class_num_dict = {"KarateClub": 4, "Cora": 7, "Citeseer": 6, "PubMed": 3, "ogbn-
                   "GitHub": 2, "USA": 4, "computers": 10, "Flickr": 7}
 
 
-def load_data(root: str, data_name: str, split='public', num_val=0.1, num_test=0.2, num_per_class=None) -> Dataset:
+def load_data(root: str, data_name: str, split='public',
+              num_val=0.1, num_test=0.2, num_per_class=None,
+              embed_dim=32, device=None) -> Dataset:
     if data_name in ["computers", "photo"]:
         dataset = Amazon(root, name=data_name, transform=RandomNodeSplit(num_val=num_val, num_test=num_test))
     elif data_name == "KarateClub":
@@ -49,5 +54,18 @@ def load_data(root: str, data_name: str, split='public', num_val=0.1, num_test=0
         raise NotImplementedError
     input_dim_dict[data_name] = dataset.num_features
     class_num_dict[data_name] = dataset.num_classes
-
     return dataset
+
+
+def get_eigen_tokens(data, embed_dim, device):
+    n = data.num_nodes
+    edge_index, edge_weight = get_laplacian(data.edge_index, normalization="sym", num_nodes=n)
+    row, col = edge_index[0].numpy(), edge_index[1].numpy()
+    L = csr_matrix((edge_weight.numpy(), (row, col)), shape=(n, n))
+    _, eigvecs = eigs(L, k=embed_dim, which='SM')
+    eigvecs = torch.tensor(eigvecs.real).to(device)
+
+    def tokens(idx):
+        return eigvecs[idx]
+
+    return tokens

@@ -5,7 +5,7 @@ from torch.optim import Adam
 import numpy as np
 from modules import *
 import gensim.downloader as api
-from utils.train_utils import EarlyStopping, act_fn, train_node2vec
+from utils.train_utils import EarlyStopping, act_fn
 from utils.logger import create_logger
 from data import load_data, input_dim_dict, ExtractNodeLoader
 from data.mappings import class_maps
@@ -44,10 +44,10 @@ class FewShotNC:
             model_dict.update(pretrained_dict)
             pretrained_model.load_state_dict(model_dict)
 
-            self.logger.info("----------Freezing weights-----------")
-            for module in pretrained_model.modules():
-                for param in module.parameters():
-                    param.requires_grad = False
+            # self.logger.info("----------Freezing weights-----------")
+            # for module in pretrained_model.modules():
+            #     for param in module.parameters():
+            #         param.requires_grad = False
             pretrained_model = pretrained_model.to(self.device)
         self.nc_model = ShotNCHead(pretrained_model, self.class_embeddings, 3 * self.configs.embed_dim,
                                100).to(self.device)
@@ -105,7 +105,6 @@ class FewShotNC:
 
     def test(self):
         data, test_loader = self.load_data(self.configs.query_set)
-        tokens = train_node2vec(data, self.configs.embed_dim, self.device)
         self.nc_model.eval()
         self.logger.info("--------------Testing--------------------")
         path = os.path.join(self.configs.checkpoints, self.configs.pretrained_model_path_FSL) + ".pt"
@@ -116,7 +115,6 @@ class FewShotNC:
         with torch.no_grad():
             for data in test_loader:
                 data = data.to(self.device)
-                data.tokens = tokens(data.n_id)
                 out = self.nc_model(data)
                 loss, correct = self.cal_loss(out, data.y, data.batch_size)
                 matches += correct
@@ -137,8 +135,6 @@ class FewShotNC:
         path = os.path.join(self.configs.checkpoints, self.configs.pretrained_model_path_FSL)
         data, dataloader = self.load_data(data_name, finetune=finetune)
 
-        tokens = train_node2vec(data, self.configs.embed_dim, self.device)
-
         optimizer = Adam(self.nc_model.parameters(), lr=lr, weight_decay=self.configs.weight_decay)
         for epoch in range(train_epochs):
             epoch_loss = []
@@ -147,7 +143,6 @@ class FewShotNC:
             for data in tqdm(dataloader):
                 optimizer.zero_grad()
                 data = data.to(self.device)
-                data.tokens = tokens(data.n_id)
                 out = self.nc_model(data)
                 loss, correct = self.cal_loss(out, data.y, data.batch_size)
                 if torch.isnan(loss).item():

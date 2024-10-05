@@ -82,7 +82,7 @@ class LinkPredHead(nn.Module):
         manifold_S = self.pretrained_model.manifold_S
         x_h = manifold_H.logmap0(x_H)
         x_s = manifold_S.logmap0(x_S)
-        x = torch.concat([x_E, x_h, x_s], dim=-1)
+        x = torch.concat([data.x, x_h, x_s], dim=-1)
         x = self.head(x)
 
         neg_edge_index = negative_sampling(

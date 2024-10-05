@@ -62,7 +62,7 @@ parser.add_argument('--weight_decay', type=float, default=0.0)
 
 # Few-Shot Learning
 parser.add_argument('--pretrained_model_path_FSL', type=str, default="./pretrained_models")
-parser.add_argument('--k_shot', type=int, default=5, choices=[0, 1, 5])
+parser.add_argument('--k_shot', type=int, default=1, choices=[0, 1, 5])
 parser.add_argument('--shot_epochs', type=int, default=100)
 parser.add_argument('--lr_few_nc', type=float, default=1e-2)
 
@@ -108,14 +108,14 @@ if configs.task == 'Pretrain':
     pretrain_exp = Pretrain(configs)
     pretrain_exp.pretrain(first_load=False, start_data=None)
 elif configs.task == 'NC':
-    exp = NodeClassification(configs, load=False, finetune=False)
+    exp = NodeClassification(configs, load=True, finetune=True)
     exp.train()
 elif configs.task == 'LP':
     exp = LinkPrediction(configs, load=True, finetune=True)
     exp.train()
 elif configs.task == 'Few-NC':
     exp = FewShotNC(configs, load=False)
-    exp.train(skip_pretrain=False)
+    exp.train(skip_pretrain=True)
 else:
     raise NotImplementedError
 
