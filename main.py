@@ -21,7 +21,7 @@ parser.add_argument('--dataset', type=str, default='PubMed',
 parser.add_argument('--pretrain_dataset', nargs="+", type=str,
                     default=['ogbn-arxiv', 'computers', 'Physics'])
 parser.add_argument('--supp_sets', nargs="+", type=str,
-                    default=['PubMed'])
+                    default=['ogbn-arxiv'])
 parser.add_argument('--query_set', type=str, default='Citeseer')
 parser.add_argument('--root_path', type=str, default='D:\datasets\Graphs')
 parser.add_argument('--num_neighbors', type=int, nargs="+", default=[20, 10],
@@ -63,7 +63,7 @@ parser.add_argument('--weight_decay', type=float, default=0.0)
 # Few-Shot Learning
 parser.add_argument('--pretrained_model_path_FSL', type=str, default="./pretrained_models")
 parser.add_argument('--k_shot', type=int, default=5, choices=[0, 1, 5])
-parser.add_argument('--shot_epochs', type=int, default=60)
+parser.add_argument('--shot_epochs', type=int, default=100)
 parser.add_argument('--lr_few_nc', type=float, default=1e-2)
 
 # Node classification
@@ -115,7 +115,7 @@ elif configs.task == 'LP':
     exp.train()
 elif configs.task == 'Few-NC':
     exp = FewShotNC(configs, load=False)
-    exp.train(skip_pretrain=True)
+    exp.train(skip_pretrain=False)
 else:
     raise NotImplementedError
 

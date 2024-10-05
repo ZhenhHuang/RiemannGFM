@@ -182,7 +182,7 @@ class NodeClassification(SupervisedExp):
 
     def cal_loss(self, output, label, batch_size):
         out = output[:batch_size]
-        y = label[:batch_size]
+        y = label[:batch_size].reshape(-1)
         loss = F.cross_entropy(out, y)
         correct = (out.argmax(dim=-1) == y).sum()
         return loss, correct
@@ -195,7 +195,7 @@ class LinkPrediction(SupervisedExp):
 
     def load_data(self, split):
         dataset = load_data(root=self.configs.root_path, data_name=self.configs.dataset)
-        train_data, val_data, test_data = RandomLinkSplit(is_undirected=True,
+        train_data, val_data, test_data = RandomLinkSplit(is_undirected=False,
                                                           add_negative_train_samples=False)(dataset[0])
         train_loader = ExtractLinkLoader(train_data, batch_size=self.configs.batch_size,
                                    num_neighbors=self.configs.num_neighbors,

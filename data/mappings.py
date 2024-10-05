@@ -79,5 +79,11 @@ class_maps = {
     "GitHub": {
         0: "Web Developer",
         1: "Machine Learning Developer"
+    },
+    "USA": {
+      0: "airport activity 0-25%",
+      1: "airport activity 25-50%",
+      2: "airport activity 50-75%",
+      3: "airport activity 75-100%"
     }
 }

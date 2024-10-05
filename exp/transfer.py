@@ -169,7 +169,7 @@ class FewShotNC:
         self.word2vec = api.load(word2vec_path)
 
     def get_class_embedding(self, supp_sets: list, query_set: str):
-        sp_pattern = r'[ -.]+'
+        sp_pattern = r'[ -.%]+'
         supp_embed_dict = {}
         for data_name in supp_sets:
             supp_embed_dict[data_name] = {}
@@ -208,7 +208,7 @@ class FewShotNC:
 
     def cal_loss(self, output, label, batch_size):
         out = output[:batch_size]
-        y = label[:batch_size]
+        y = label[:batch_size].reshape(-1)
         loss = F.cross_entropy(out, y)
         correct = (out.argmax(dim=-1) == y).sum()
         return loss, correct
