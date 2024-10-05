@@ -8,11 +8,10 @@ from modules import *
 from utils.train_utils import EarlyStopping, act_fn
 from utils.evall_utils import cal_accuracy, cal_AUC_AP, cal_F1
 from utils.logger import create_logger
-from data import *
+from data import load_data, ExtractNodeLoader, ExtractLinkLoader, input_dim_dict, class_num_dict, get_eigen_tokens
 from torch_geometric.transforms import RandomLinkSplit
 import os
 from tqdm import tqdm
-from torch_geometric.nn.models import Node2Vec
 
 
 class SupervisedExp:
@@ -119,7 +118,6 @@ class NodeClassification(SupervisedExp):
                     preds.append(pred)
                 trues = np.concatenate(trues, axis=-1)
                 preds = np.concatenate(preds, axis=-1)
-
                 train_loss = np.mean(epoch_loss)
                 train_acc = cal_accuracy(preds, trues)
 
@@ -193,8 +191,8 @@ class NodeClassification(SupervisedExp):
                 loss, pred, true = self.cal_loss(out, data.y, data.batch_size)
                 trues.append(true)
                 preds.append(pred)
-            trues = np.concatenate(trues, axis=-1)
-            preds = np.concatenate(preds, axis=-1)
+        trues = np.concatenate(trues, axis=-1)
+        preds = np.concatenate(preds, axis=-1)
         test_acc = cal_accuracy(preds, trues)
         weighted_f1, macro_f1 = cal_F1(preds, trues)
         self.logger.info(f"test_acc={test_acc * 100: .2f}%, "
@@ -221,8 +219,8 @@ class LinkPrediction(SupervisedExp):
         train_data, val_data, test_data = RandomLinkSplit(is_undirected=False,
                                                           add_negative_train_samples=False)(dataset[0])
         train_data.tokens = get_eigen_tokens(train_data, self.configs.embed_dim, self.device)
-        val_data.tokens = get_eigen_tokens(train_data, self.configs.embed_dim, self.device)
-        test_data.tokens = get_eigen_tokens(train_data, self.configs.embed_dim, self.device)
+        val_data.tokens = train_data.tokens
+        test_data.tokens = train_data.tokens
         train_loader = ExtractLinkLoader(train_data, batch_size=self.configs.batch_size,
                                    num_neighbors=self.configs.num_neighbors,
                                          neg_sampling_ratio=2.0,
