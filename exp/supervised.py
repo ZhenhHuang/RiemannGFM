@@ -1,8 +1,7 @@
 import torch
 import torch.nn.functional as F
 import torch.nn as nn
-from torch.optim import Adam, SparseAdam
-from geoopt.optim import RiemannianAdam
+from torch.optim import Adam
 import numpy as np
 from modules import *
 from utils.train_utils import EarlyStopping, act_fn
@@ -77,8 +76,7 @@ class NodeClassification(SupervisedExp):
         return nc_model
 
     def load_data(self, split: str):
-        dataset = load_data(root=self.configs.root_path, data_name=self.configs.dataset,
-                            device=self.device, embed_dim=self.configs.embed_dim)
+        dataset = load_data(root=self.configs.root_path, data_name=self.configs.dataset)
         data = dataset[0]
         data.tokens = get_eigen_tokens(data, self.configs.embed_dim, self.device)
         train_loader = ExtractNodeLoader(data, input_nodes=data.train_mask, batch_size=self.configs.batch_size,
@@ -147,6 +145,7 @@ class NodeClassification(SupervisedExp):
         mean, std = np.mean(total_test_macro_f1), np.std(total_test_macro_f1)
         self.logger.info(f"Evaluation macro F1 is {mean * 100: .2f}% +- {std * 100: .2f}%")
 
+
     def train_step(self, data, optimizer):
         optimizer.zero_grad()
         out = self.nc_model(data)
@@ -214,8 +213,7 @@ class LinkPrediction(SupervisedExp):
         self.lp_model = self.load_model()
 
     def load_data(self, split):
-        dataset = load_data(root=self.configs.root_path, data_name=self.configs.dataset,
-                            device=self.device, embed_dim=self.configs.embed_dim)
+        dataset = load_data(root=self.configs.root_path, data_name=self.configs.dataset)
         train_data, val_data, test_data = RandomLinkSplit(is_undirected=False,
                                                           add_negative_train_samples=False)(dataset[0])
         train_data.tokens = get_eigen_tokens(train_data, self.configs.embed_dim, self.device)
@@ -337,86 +335,3 @@ class LinkPrediction(SupervisedExp):
             test_label = torch.cat(test_label, dim=-1).cpu().numpy()
             test_auc, test_ap = cal_AUC_AP(test_pred, test_label)
         return test_auc, test_ap
-
-
-class GraphClassification(SupervisedExp):
-    def __init__(self, configs, pretrained_model=None, load=False, finetune=False):
-        super(GraphClassification, self).__init__(configs, pretrained_model, load, finetune)
-        self.gc_model = self.load_model()
-
-    def load_model(self):
-        gc_model = nn.Linear(self.pretrained_model, 3 * self.configs.embed_dim,
-                             class_num_dict[self.configs.dataset]).to(self.device)
-        return gc_model
-
-    def load_data(self, split):
-        # TODO
-        pass
-
-    def train(self):
-        self.gc_model.train()
-        optimizer = Adam(self.gc_model.parameters(), lr=self.configs.lr_gc,
-                         weight_decay=self.configs.weight_decay_gc)
-        early_stop = EarlyStopping(self.configs.patience)
-        for epoch in range(self.configs.gc_epochs):
-            epoch_loss = []
-            epoch_correct = 0.
-
-            for data in self.dataloader:
-                loss, correct = self.train_step(data, optimizer)
-                epoch_correct += correct
-                epoch_loss.append(epoch_loss)
-
-            train_acc = epoch_correct / len(self.dataloader.dataset)
-            train_loss = np.mean(epoch_loss)
-
-            self.logger.info(f"Epoch {epoch}: train_loss={train_loss}, train_acc={train_acc * 100: .2f}%")
-
-            if epoch % self.configs.val_every == 0:
-                val_loss, val_acc = self.val()
-                self.logger.info(f"Epoch {epoch}: val_loss={val_loss}, val_acc={val_acc * 100: .2f}%")
-                early_stop(val_loss, self.nc_model, self.configs.checkpoints, self.configs.task_model_path)
-                if early_stop.early_stop:
-                    print("---------Early stopping--------")
-                    break
-        test_acc = self.test()
-        self.logger.info(f"test_acc={test_acc * 100: .2f}%")
-
-    def train_step(self, data, optimizer):
-        optimizer.zero_grad()
-        out = self.gc_model(data)
-        loss = F.cross_entropy(out, data.y)
-        loss.backward()
-        optimizer.step()
-        pred = out.argmax(dim=-1)
-        correct = (pred == data.y).sum().item()
-        return loss.item(), correct
-
-    def val(self, val_loader):
-        self.gc_model.eval()
-        val_loss = []
-        val_correct = 0.
-        with torch.no_grad():
-            for data in self.dataloader:
-                out = self.gc_model(data)
-                loss = F.cross_entropy(out, data.y)
-                val_loss.append(loss.item())
-                pred = out.argmax(dim=-1)
-                val_correct += (pred == data.y).sum().item()
-        self.gc_model.train()
-        return np.mean(val_loss), val_correct / len(self.dataloader.dataset)
-
-    def test(self):
-        self.gc_model.eval()
-        test_correct = 0.
-        with torch.no_grad():
-            for data in self.dataloader:
-                out = self.gc_model(data)
-                pred = out.argmax(dim=-1)
-                test_correct += (pred == data.y).sum().item()
-        return test_correct / len(self.dataloader.dataset)
-
-    def cal_loss(self, output, label):
-        loss = F.cross_entropy(output, label)
-        acc = cal_accuracy(output, label)
-        return loss, acc

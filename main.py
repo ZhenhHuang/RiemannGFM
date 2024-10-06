@@ -62,7 +62,7 @@ parser.add_argument('--weight_decay', type=float, default=0.0)
 
 # Few-Shot Learning
 parser.add_argument('--trained_model_path_FSL', type=str, default="./few_pretrained_models")
-parser.add_argument('--k_shot', type=int, default=5, choices=[1, 5])
+parser.add_argument('--k_shot', type=int, default=1, choices=[1, 5])
 parser.add_argument('--shot_epochs', type=int, default=30)
 parser.add_argument('--lr_few_nc', type=float, default=1e-2)
 

@@ -18,8 +18,7 @@ class_num_dict = {"KarateClub": 4, "Cora": 7, "Citeseer": 6, "PubMed": 3, "ogbn-
 
 
 def load_data(root: str, data_name: str, split='public',
-              num_val=0.1, num_test=0.2, num_per_class=None,
-              embed_dim=32, device=None) -> Dataset:
+              num_val=0.1, num_test=0.2, num_per_class=None) -> Dataset:
     if data_name in ["computers", "photo"]:
         dataset = Amazon(root, name=data_name, transform=RandomNodeSplit(num_val=num_val, num_test=num_test))
     elif data_name == "KarateClub":
