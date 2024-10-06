@@ -17,7 +17,7 @@ class_num_dict = {"KarateClub": 4, "Cora": 7, "Citeseer": 6, "PubMed": 3, "ogbn-
                   "GitHub": 2, "USA": 4, "computers": 10, "Flickr": 7}
 
 
-def load_data(root: str, data_name: str, split='public',
+def load_data(root: str, data_name: str,
               num_val=0.1, num_test=0.2, num_per_class=None) -> Dataset:
     if data_name in ["computers", "photo"]:
         dataset = Amazon(root, name=data_name, transform=RandomNodeSplit(num_val=num_val, num_test=num_test))
@@ -28,6 +28,9 @@ def load_data(root: str, data_name: str, split='public',
     elif data_name in ['Cora', 'Citeseer', 'PubMed']:
         if num_per_class is None:
             num_per_class = 20
+            split = "public"
+        else:
+            split = "random"
         dataset = Planetoid(root, name=data_name, split=split, num_train_per_class=num_per_class)
     elif data_name == 'ogbn-arxiv':
         dataset = PygNodePropPredDataset(name=data_name, root=root, transform=RandomNodeSplit(num_val=0.2, num_test=0.3))
@@ -35,13 +38,13 @@ def load_data(root: str, data_name: str, split='public',
         if num_per_class is None:
             transform = RandomNodeSplit(num_val=0.1, num_test=0.2)
         else:
-            transform = RandomNodeSplit(num_val=0.1, num_test=0.2, num_train_per_class=num_per_class)
+            transform = RandomNodeSplit(num_val=0.1, num_test=0.2, split="test_rest", num_train_per_class=num_per_class)
         dataset = GitHub(os.path.join(root, "GitHub"), transform=transform)
     elif data_name in ["USA", "Brazil", "Europe"]:
         if num_per_class is None:
             transform = RandomNodeSplit(num_val=0.1, num_test=0.2)
         else:
-            transform = RandomNodeSplit(num_val=0.1, num_test=0.2, num_train_per_class=num_per_class)
+            transform = RandomNodeSplit(num_val=0.1, num_test=0.2, split="test_rest", num_train_per_class=num_per_class)
         dataset = Airports(root, data_name, transform=transform)
     elif data_name == 'Flickr':
         dataset = Flickr(os.path.join(root, "Flickr"))
