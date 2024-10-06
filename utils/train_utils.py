@@ -3,9 +3,15 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torch.optim import SparseAdam
 import warnings
 
 warnings.filterwarnings("ignore")
+
+
+def get_word2vec_dim(model_name):
+    if model_name == 'glove-wiki-gigaword-100':
+        return 100
 
 
 def act_fn(act_str: str):

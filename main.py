@@ -61,6 +61,7 @@ parser.add_argument('--lr', type=float, default=0.01)
 parser.add_argument('--weight_decay', type=float, default=0.0)
 
 # Few-Shot Learning
+parser.add_argument('--pretrained_word2vec', type=str, default='glove-wiki-gigaword-100')
 parser.add_argument('--trained_model_path_FSL', type=str, default="./few_pretrained_models")
 parser.add_argument('--k_shot', type=int, default=1, choices=[1, 5])
 parser.add_argument('--shot_epochs', type=int, default=30)

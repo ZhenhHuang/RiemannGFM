@@ -5,7 +5,7 @@ from torch.optim import Adam
 import numpy as np
 from modules import *
 import gensim.downloader as api
-from utils.train_utils import EarlyStopping, act_fn
+from utils.train_utils import EarlyStopping, act_fn, get_word2vec_dim
 from utils.evall_utils import cal_accuracy, cal_F1
 from utils.logger import create_logger
 from data import load_data, input_dim_dict, ExtractNodeLoader, get_eigen_tokens
@@ -24,7 +24,7 @@ class FewShotNC:
             self.device = torch.device('cuda')
         else:
             self.device = torch.device('cpu')
-        self.load_word2vec()
+        self.load_word2vec(self.configs.pretrained_word2vec)
         self.supp_sets = self.configs.pretrain_dataset
         self.query_set = self.configs.query_set
         supp_embed_dict, query_embed_dict = self.get_class_embedding(self.supp_sets, self.query_set)
@@ -51,8 +51,8 @@ class FewShotNC:
                     param.requires_grad = False
             pretrained_model = pretrained_model.to(self.device)
         self.nc_model = ShotNCHead(pretrained_model, self.class_embeddings,
-                                   2 * self.configs.embed_dim + input_dim_dict[self.query_set],
-                               100).to(self.device)
+                            2 * self.configs.embed_dim + input_dim_dict[self.query_set],
+                            get_word2vec_dim(self.configs.pretrained_word2vec)).to(self.device)
 
     def load_data(self, data_name, finetune=False):
         """
