@@ -193,7 +193,7 @@ class FewShotNC:
         cls_map = class_maps[query_set]
         for k, word in cls_map.items():
             text = re.split(sp_pattern, word)
-            query_embed_dict[k] = np.mean([self.word2vec[t.lower()] for t in text], axis=0)
+            query_embed_dict[k] = np.mean([self.word2vec[t.lower()] for t in text if t != ''], axis=0)
 
         return supp_embed_dict, query_embed_dict
 

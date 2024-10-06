@@ -20,7 +20,7 @@ parser.add_argument('--dataset', type=str, default='Citeseer',
                     help="['computers', 'photo', 'KarateClub', 'CS', 'Physics']")
 parser.add_argument('--pretrain_dataset', nargs="+", type=str,
                     default=['ogbn-arxiv', 'computers', 'Physics'])
-parser.add_argument('--query_set', type=str, default='Citeseer')
+parser.add_argument('--query_set', type=str, default='USA')
 parser.add_argument('--root_path', type=str, default='datasets')
 parser.add_argument('--num_neighbors', type=int, nargs="+", default=[20, 10],
                     help="Number of neighbors of data_loaders")
