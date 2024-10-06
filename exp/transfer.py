@@ -6,6 +6,7 @@ import numpy as np
 from modules import *
 import gensim.downloader as api
 from utils.train_utils import EarlyStopping, act_fn
+from utils.evall_utils import cal_accuracy, cal_F1
 from utils.logger import create_logger
 from data import load_data, input_dim_dict, ExtractNodeLoader, get_eigen_tokens
 from data.mappings import class_maps
@@ -24,7 +25,7 @@ class FewShotNC:
         else:
             self.device = torch.device('cpu')
         self.load_word2vec()
-        self.supp_sets = self.configs.supp_sets
+        self.supp_sets = self.configs.pretrain_dataset
         self.query_set = self.configs.query_set
         supp_embed_dict, query_embed_dict = self.get_class_embedding(self.supp_sets, self.query_set)
         self.merge_embeddings(supp_embed_dict, query_embed_dict)
@@ -44,12 +45,13 @@ class FewShotNC:
             model_dict.update(pretrained_dict)
             pretrained_model.load_state_dict(model_dict)
 
-            # self.logger.info("----------Freezing weights-----------")
-            # for module in pretrained_model.modules():
-            #     for param in module.parameters():
-            #         param.requires_grad = False
+            self.logger.info("----------Freezing weights-----------")
+            for module in pretrained_model.modules():
+                for param in module.parameters():
+                    param.requires_grad = False
             pretrained_model = pretrained_model.to(self.device)
-        self.nc_model = ShotNCHead(pretrained_model, self.class_embeddings, 3 * self.configs.embed_dim,
+        self.nc_model = ShotNCHead(pretrained_model, self.class_embeddings,
+                                   2 * self.configs.embed_dim + input_dim_dict[self.query_set],
                                100).to(self.device)
 
     def load_data(self, data_name, finetune=False):
@@ -88,75 +90,86 @@ class FewShotNC:
                                        capacity=self.configs.capacity)
         return data, dataloader
 
-    def train(self, skip_pretrain=False):
-        if skip_pretrain is False:
-            if not isinstance(self.configs.supp_sets, list):
-                self.configs.supp_sets = [self.configs.supp_sets]
-            for i, data_name in enumerate(self.supp_sets):
-                load = True
-                if i == 0:
-                    load = False
-                self.logger.info(f"----------Pretraining on {data_name}--------------")
-                self._train_step(load, data_name, self.configs.pretrain_epochs, self.configs.lr)
-                torch.cuda.empty_cache()
-        if self.k_shot > 0:
-            self.logger.info(f"----------Fine-tuning on {self.query_set}---------")
-            self._train_step(load=True, data_name=self.query_set,
-                             train_epochs=self.configs.shot_epochs, finetune=True,
-                             lr=self.configs.lr_few_nc)
-        self.test()
+    def train(self, load_trained_model=False):
+        total_test_acc = []
+        total_test_weighted_f1 = []
+        total_test_macro_f1 = []
+        for t in range(self.configs.exp_iters):
+            self.load_model()
+            if self.k_shot > 0:
+                self.logger.info(f"----------Fine-tuning on {self.query_set}---------")
+                self._train_step(load=load_trained_model, data_name=self.query_set,
+                                train_epochs=self.configs.shot_epochs, finetune=True,
+                                lr=self.configs.lr_few_nc)
+            test_acc, weighted_f1, macro_f1 = self.test()
+            total_test_acc.append(test_acc)
+            total_test_weighted_f1.append(weighted_f1)
+            total_test_macro_f1.append(macro_f1)
+        mean, std = np.mean(total_test_acc), np.std(total_test_acc)
+        self.logger.info(f"Evaluation Acc is {mean * 100: .2f}% +- {std * 100: .2f}%")
+        mean, std = np.mean(total_test_weighted_f1), np.std(total_test_weighted_f1)
+        self.logger.info(f"Evaluation weighted F1 is {mean * 100: .2f}% +- {std * 100: .2f}%")
+        mean, std = np.mean(total_test_macro_f1), np.std(total_test_macro_f1)
+        self.logger.info(f"Evaluation macro F1 is {mean * 100: .2f}% +- {std * 100: .2f}%")
 
     def test(self):
         data, test_loader = self.load_data(self.configs.query_set)
         self.nc_model.eval()
         self.logger.info("--------------Testing--------------------")
-        path = os.path.join(self.configs.checkpoints, self.configs.pretrained_model_path_FSL) + ".pt"
+        path = os.path.join(self.configs.checkpoints, self.configs.trained_model_path_FSL) + ".pt"
         self.logger.info(f"--------------Loading from {path}--------------------")
         self.nc_model.load_state_dict(torch.load(path))
-        total = 0
-        matches = 0
+        trues = []
+        preds = []
         with torch.no_grad():
             for data in test_loader:
                 data = data.to(self.device)
                 out = self.nc_model(data)
-                loss, correct = self.cal_loss(out, data.y, data.batch_size)
-                matches += correct
-                total += data.batch_size
-        test_acc = (matches / total).item()
-        self.logger.info(f"test_acc={test_acc * 100: .2f}%")
-        return test_acc
+                loss, pred, true = self.cal_loss(out, data.y, data.batch_size)
+                trues.append(true)
+                preds.append(pred)
+        trues = np.concatenate(trues, axis=-1)
+        preds = np.concatenate(preds, axis=-1)
+        test_acc = cal_accuracy(preds, trues)
+        weighted_f1, macro_f1 = cal_F1(preds, trues)
+        self.logger.info(f"test_acc={test_acc * 100: .2f}%, "
+                         f"weighted_f1={weighted_f1 * 100: .2f},"
+                         f"macro_f1={macro_f1 * 100: .2f}%")
+        return test_acc, weighted_f1, macro_f1
 
     def _train_step(self, load, data_name, train_epochs, lr, finetune=False):
         if load:
-            load_path = os.path.join(self.configs.checkpoints, self.configs.pretrained_model_path_FSL) + f".pt"
-            self.logger.info(f"---------------Loading pretrained models from {load_path}-------------")
+            load_path = os.path.join(self.configs.checkpoints, self.configs.trained_model_path_FSL) + f".pt"
+            self.logger.info(f"---------------Loading trained models from {load_path}-------------")
             pretrained_dict = torch.load(load_path)
             model_dict = self.nc_model.state_dict()
             model_dict.update(pretrained_dict)
             self.nc_model.load_state_dict(model_dict)
 
-        path = os.path.join(self.configs.checkpoints, self.configs.pretrained_model_path_FSL)
+        path = os.path.join(self.configs.checkpoints, self.configs.trained_model_path_FSL)
         data, dataloader = self.load_data(data_name, finetune=finetune)
 
         optimizer = Adam(self.nc_model.parameters(), lr=lr, weight_decay=self.configs.weight_decay)
         for epoch in range(train_epochs):
             epoch_loss = []
-            total = 0
-            matches = 0
+            trues = []
+            preds = []
             for data in tqdm(dataloader):
                 optimizer.zero_grad()
                 data = data.to(self.device)
                 out = self.nc_model(data)
-                loss, correct = self.cal_loss(out, data.y, data.batch_size)
+                loss, pred, true = self.cal_loss(out, data.y, data.batch_size)
                 if torch.isnan(loss).item():
                     continue
                 loss.backward()
                 optimizer.step()
                 epoch_loss.append(loss.item())
-                matches += correct
-                total += data.batch_size
+                trues.append(true)
+                preds.append(pred)
+            trues = np.concatenate(trues, axis=-1)
+            preds = np.concatenate(preds, axis=-1)
             train_loss = np.mean(epoch_loss)
-            train_acc = (matches / total).item()
+            train_acc = cal_accuracy(preds, trues)
             self.logger.info(f"Epoch {epoch}: train_loss={train_loss}, train_acc={train_acc * 100: .2f}%")
             # self.logger.info(f"---------------Saving pretrained models to {path}_{epoch}.pt-------------")
             # torch.save(self.nc_model.state_dict(), path + f"_{epoch}.pt")  # save epoch every
@@ -208,5 +221,5 @@ class FewShotNC:
         out = output[:batch_size]
         y = label[:batch_size].reshape(-1)
         loss = F.cross_entropy(out, y)
-        correct = (out.argmax(dim=-1) == y).sum()
-        return loss, correct
+        pred = out.argmax(dim=-1).detach().cpu().numpy()
+        return loss, pred, y.detach().cpu().numpy()

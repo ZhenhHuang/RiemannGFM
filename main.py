@@ -14,20 +14,18 @@ np.random.seed(seed)
 parser = argparse.ArgumentParser(description='Geometric Graph Foundation Model')
 
 """Dataset settings"""
-parser.add_argument('--task', type=str, default='NC',
+parser.add_argument('--task', type=str, default='Few-NC',
                     choices=['NC', 'LP', 'GC', 'Pretrain', 'Few-NC'])
 parser.add_argument('--dataset', type=str, default='Citeseer',
-                    help="[Citesser, PubMed, GitHub, USA]")
+                    help="['computers', 'photo', 'KarateClub', 'CS', 'Physics']")
 parser.add_argument('--pretrain_dataset', nargs="+", type=str,
                     default=['ogbn-arxiv', 'computers', 'Physics'])
-parser.add_argument('--supp_sets', nargs="+", type=str,
-                    default=['ogbn-arxiv'])
 parser.add_argument('--query_set', type=str, default='Citeseer')
-parser.add_argument('--root_path', type=str, default='D:\datasets\Graphs')
+parser.add_argument('--root_path', type=str, default='datasets')
 parser.add_argument('--num_neighbors', type=int, nargs="+", default=[20, 10],
                     help="Number of neighbors of data_loaders")
-parser.add_argument('--batch_size', type=int, default=32)
-parser.add_argument('--capacity', type=int, default=100, help="Capacity of Cache for dataloader")
+parser.add_argument('--batch_size', type=int, default=64)
+parser.add_argument('--capacity', type=int, default=1000, help="Capacity of Cache for dataloader")
 
 """Checkpoints and logger"""
 parser.add_argument('--checkpoints', type=str, default='./checkpoints/')
@@ -47,7 +45,7 @@ parser.add_argument('--hidden_dim', type=int, default=256)
 parser.add_argument('--activation', type=str, default=None)
 
 # LP head
-parser.add_argument('--embed_dim_lp', type=int, default=32)
+parser.add_argument('--embed_dim_lp', type=int, default=64)
 
 """Training settings"""
 parser.add_argument('--exp_iters', type=int, default=5)
@@ -58,14 +56,14 @@ parser.add_argument('--id', type=int, default=2)
 """Pretraining"""
 parser.add_argument('--is_load', type=bool, default=False, help='Whether load model from checkpoints')
 parser.add_argument('--pretrain_level', type=str, default="node", help='pretraining task level')
-parser.add_argument('--pretrain_epochs', type=int, default=10)
+parser.add_argument('--pretrain_epochs', type=int, default=3)
 parser.add_argument('--lr', type=float, default=0.01)
 parser.add_argument('--weight_decay', type=float, default=0.0)
 
 # Few-Shot Learning
-parser.add_argument('--pretrained_model_path_FSL', type=str, default="./pretrained_models")
-parser.add_argument('--k_shot', type=int, default=1, choices=[0, 1, 5])
-parser.add_argument('--shot_epochs', type=int, default=100)
+parser.add_argument('--trained_model_path_FSL', type=str, default="./few_pretrained_models")
+parser.add_argument('--k_shot', type=int, default=5, choices=[1, 5])
+parser.add_argument('--shot_epochs', type=int, default=30)
 parser.add_argument('--lr_few_nc', type=float, default=1e-2)
 
 # Node classification
@@ -116,8 +114,8 @@ elif configs.task == 'LP':
     exp = LinkPrediction(configs, load=True, finetune=True)
     exp.train()
 elif configs.task == 'Few-NC':
-    exp = FewShotNC(configs, load=False)
-    exp.train(skip_pretrain=True)
+    exp = FewShotNC(configs, load=True)
+    exp.train(load_trained_model=False)
 else:
     raise NotImplementedError
 

@@ -1,4 +1,3 @@
-
 class_maps = {
     "Cora": {
         0: 'Case-Based',
@@ -81,9 +80,16 @@ class_maps = {
         1: "Machine Learning Developer"
     },
     "USA": {
-      0: "airport activity 0-25%",
-      1: "airport activity 25-50%",
-      2: "airport activity 50-75%",
-      3: "airport activity 75-100%"
+        0: "airport activity 0-25%",
+        1: "airport activity 25-50%",
+        2: "airport activity 50-75%",
+        3: "airport activity 75-100%"
+    },
+    "Physics": {
+        0: "Astrophysics",
+        1: "Condensed Matter",
+        2: "High Energy Physics",
+        3: "Mathematical Physics",
+        4: "Other"
     }
 }

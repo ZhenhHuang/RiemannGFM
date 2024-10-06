@@ -128,7 +128,7 @@ class ShotNCHead(nn.Module):
         manifold_S = self.pretrained_model.manifold_S
         x_h = manifold_H.logmap0(x_H)
         x_s = manifold_S.logmap0(x_S)
-        x = torch.concat([x_E, x_h, x_s], dim=-1)
+        x = torch.concat([data.x, x_h, x_s], dim=-1)
         x = self.head(x, data.edge_index)
         out = F.cosine_similarity(x.unsqueeze(1), self.cls_embeddings.unsqueeze(0), dim=-1)
         return out
