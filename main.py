@@ -56,6 +56,7 @@ parser.add_argument('--id', type=int, default=2)
 """Pretraining"""
 parser.add_argument('--is_load', type=bool, default=False, help='Whether load model from checkpoints')
 parser.add_argument('--pretrain_level', type=str, default="node", help='pretraining task level')
+parser.add_argument('--pretrain_iters', type=int, default=10)
 parser.add_argument('--pretrain_epochs', type=int, default=3)
 parser.add_argument('--lr', type=float, default=0.01)
 parser.add_argument('--weight_decay', type=float, default=0.0)

@@ -6,7 +6,7 @@ import numpy as np
 from modules import *
 from utils.train_utils import EarlyStopping, act_fn
 from utils.logger import create_logger
-from data import load_data, input_dim_dict, ExtractNodeLoader
+from data import load_data, input_dim_dict, ExtractNodeLoader, get_eigen_tokens
 import os
 from tqdm import tqdm
 
@@ -79,7 +79,7 @@ class Pretrain:
     def pretrain(self, first_load=False, start_data=None):
         if not isinstance(self.configs.pretrain_dataset, list):
             self.configs.pretrain_dataset = [self.configs.pretrain_dataset]
-        for e in range(10):
+        for e in range(self.configs.pretrain_iters):
             for i, data_name in enumerate(self.configs.pretrain_dataset):
                 if start_data is not None and e == 0:
                     if data_name != start_data:
