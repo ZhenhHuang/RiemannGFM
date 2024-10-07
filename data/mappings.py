@@ -1,3 +1,4 @@
+
 class_maps = {
     "Cora": {
         0: 'Case-Based',
@@ -80,10 +81,10 @@ class_maps = {
         1: "Machine Learning Developer"
     },
     "USA": {
-        0: "airport activity 0-25%",
-        1: "airport activity 25-50%",
-        2: "airport activity 50-75%",
-        3: "airport activity 75-100%"
+      0: "airport activity 0-25%",
+      1: "airport activity 25-50%",
+      2: "airport activity 50-75%",
+      3: "airport activity 75-100%"
     },
     "Physics": {
         0: "Astrophysics",
@@ -91,5 +92,17 @@ class_maps = {
         2: "High Energy Physics",
         3: "Mathematical Physics",
         4: "Other"
+    },
+    "WikiCS": {
+        0: "Artificial Intelligence",
+        1: "Databases",
+        2: "Operating Systems",
+        3: "Computer Architecture",
+        4: "Computer Networks",
+        5: "Computer Security",
+        6: "Graphics",
+        7: "Human-Computer Interaction",
+        8: "Programming Languages",
+        9: "Software Engineering",
     }
 }
