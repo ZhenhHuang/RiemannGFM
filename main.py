@@ -44,8 +44,10 @@ parser.add_argument('--embed_dim', type=int, default=32, help='Embedding dimensi
 parser.add_argument('--hidden_dim', type=int, default=256)
 parser.add_argument('--activation', type=str, default=None)
 
-# LP head
-parser.add_argument('--embed_dim_lp', type=int, default=64)
+# Task head
+parser.add_argument('--embed_dim_lp', type=int, default=64)  # fine tune LP
+parser.add_argument('--task_hidden_dim', type=int, default=128)  # for few shot
+parser.add_argument('--nc_hidden_dim', type=int, default=32)  # for fine tune NC
 
 """Training settings"""
 parser.add_argument('--exp_iters', type=int, default=5)

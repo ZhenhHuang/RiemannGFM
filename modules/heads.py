@@ -26,7 +26,7 @@ class GCN(nn.Module):
 
 
 class NodeClsHead(nn.Module):
-    def __init__(self, pretrained_model, in_dim, num_cls):
+    def __init__(self, pretrained_model, in_dim, hidden_dim, num_cls):
         """
 
         :param in_dim: input dimension of three components
@@ -34,8 +34,8 @@ class NodeClsHead(nn.Module):
         """
         super(NodeClsHead, self).__init__()
         self.pretrained_model = pretrained_model
-        self.head = GCN(2, in_dim, 32, num_cls, drop_edge=0.5, drop_feats=0.2)
-    
+        self.head = GCN(2, in_dim, hidden_dim, num_cls, drop_edge=0.5, drop_feats=0.2)
+
     def forward(self, data):
         """
 
@@ -49,25 +49,6 @@ class NodeClsHead(nn.Module):
         x_s = manifold_S.logmap0(x_S)
         x = torch.concat([data.x, x_h, x_s], dim=-1)
         return self.head(x, data.edge_index)
-
-
-class GraphClsHead(nn.Module):
-    def __init__(self, pretrained_model, in_dim, num_cls):
-        super(GraphClsHead, self).__init__()
-        self.pretrained_model = pretrained_model
-        self.head = nn.Linear(in_dim, num_cls)
-
-    def forward(self, data):
-        x_E, x_H, x_S = self.pretrained_model(data)
-        manifold_H = self.pretrained_model.manifold_H
-        manifold_S = self.pretrained_model.manifold_S
-        m_E = x_E.mean(0)
-        m_H = manifold_H.Frechet_mean(x_H, dim=0)
-        m_H = manifold_H.logmap0(m_H)
-        m_S = manifold_S.Frechet_mean(x_S, dim=0)
-        m_S = manifold_S.logmap0(m_S)
-        x = torch.concat([m_E, m_H, m_S], dim=-1).mean(0)
-        return self.head(x)
 
 
 class LinkPredHead(nn.Module):
@@ -85,28 +66,15 @@ class LinkPredHead(nn.Module):
         x = torch.concat([data.x, x_h, x_s], dim=-1)
         x = self.head(x)
 
-        neg_edge_index = negative_sampling(
-            edge_index=data.edge_index, num_nodes=data.num_nodes,
-            num_neg_samples=data.edge_label_index.size(1), method='sparse')
-
-        edge_label_index = torch.cat(
-            [data.edge_label_index, neg_edge_index],
-            dim=-1,
-        )
-        edge_label = torch.cat([
-            data.edge_label,
-            data.edge_label.new_zeros(neg_edge_index.size(1))
-        ], dim=0)
-
-        x_src = x[edge_label_index[0]]
-        x_dst = x[edge_label_index[1]]
+        x_src = x[data.edge_label_index[0]]
+        x_dst = x[data.edge_label_index[1]]
         score = F.cosine_similarity(x_src, x_dst, dim=-1)
 
-        return score, edge_label
+        return score, data.edge_label
 
 
 class ShotNCHead(nn.Module):
-    def __init__(self, pretrained_model, cls_embeddings, in_dim, cls_dim):
+    def __init__(self, pretrained_model, cls_embeddings, in_dim, hidden_dim, cls_dim):
         """
 
         :param in_dim: input dimension of three components
@@ -114,7 +82,7 @@ class ShotNCHead(nn.Module):
         """
         super(ShotNCHead, self).__init__()
         self.pretrained_model = pretrained_model
-        self.head = GCN(2, in_dim, 128, cls_dim, drop_edge=0.5, drop_feats=0.2)
+        self.head = GCN(2, in_dim, hidden_dim, cls_dim, drop_edge=0.5, drop_feats=0.2)
         self.cls_embeddings = cls_embeddings
 
     def forward(self, data):

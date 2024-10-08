@@ -72,6 +72,7 @@ class NodeClassification(SupervisedExp):
 
     def load_model(self):
         nc_model = NodeClsHead(self.pretrained_model, 2 * self.configs.embed_dim + input_dim_dict[self.configs.dataset],
+                               self.configs.nc_hidden_dim,
                                class_num_dict[self.configs.dataset]).to(self.device)
         return nc_model
 
@@ -214,22 +215,22 @@ class LinkPrediction(SupervisedExp):
 
     def load_data(self, split):
         dataset = load_data(root=self.configs.root_path, data_name=self.configs.dataset)
-        train_data, val_data, test_data = RandomLinkSplit(is_undirected=False,
+        train_data, val_data, test_data = RandomLinkSplit(num_val=0.05, num_test=0.1, is_undirected=False,
                                                           add_negative_train_samples=False)(dataset[0])
         train_data.tokens = get_eigen_tokens(train_data, self.configs.embed_dim, self.device)
         val_data.tokens = train_data.tokens
         test_data.tokens = train_data.tokens
         train_loader = ExtractLinkLoader(train_data, batch_size=self.configs.batch_size,
                                    num_neighbors=self.configs.num_neighbors,
-                                         neg_sampling_ratio=2.0,
+                                         neg_sampling_ratio=0.5,
                                    capacity=self.configs.capacity)
         val_loader = ExtractLinkLoader(val_data, batch_size=self.configs.batch_size,
                                      num_neighbors=self.configs.num_neighbors,
-                                       neg_sampling_ratio=2.0,
+                                       neg_sampling_ratio=0.5,
                                      capacity=self.configs.capacity)
         test_loader = ExtractLinkLoader(test_data, batch_size=self.configs.batch_size,
                                      num_neighbors=self.configs.num_neighbors,
-                                        neg_sampling_ratio=2.0,
+                                        neg_sampling_ratio=0.5,
                                      capacity=self.configs.capacity)
         if split == 'test':
             return test_loader

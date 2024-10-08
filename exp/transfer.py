@@ -52,6 +52,7 @@ class FewShotNC:
             pretrained_model = pretrained_model.to(self.device)
         self.nc_model = ShotNCHead(pretrained_model, self.class_embeddings,
                             2 * self.configs.embed_dim + input_dim_dict[self.query_set],
+                            self.configs.task_hidden_dim,
                             get_word2vec_dim(self.configs.pretrained_word2vec)).to(self.device)
 
     def load_data(self, data_name, finetune=False):
