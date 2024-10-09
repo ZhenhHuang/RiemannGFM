@@ -222,15 +222,15 @@ class LinkPrediction(SupervisedExp):
         test_data.tokens = train_data.tokens
         train_loader = ExtractLinkLoader(train_data, batch_size=self.configs.batch_size,
                                    num_neighbors=self.configs.num_neighbors,
-                                         neg_sampling_ratio=0.5,
+                                         neg_sampling_ratio=1.,
                                    capacity=self.configs.capacity)
         val_loader = ExtractLinkLoader(val_data, batch_size=self.configs.batch_size,
                                      num_neighbors=self.configs.num_neighbors,
-                                       neg_sampling_ratio=0.5,
+                                       neg_sampling_ratio=1.,
                                      capacity=self.configs.capacity)
         test_loader = ExtractLinkLoader(test_data, batch_size=self.configs.batch_size,
                                      num_neighbors=self.configs.num_neighbors,
-                                        neg_sampling_ratio=0.5,
+                                        neg_sampling_ratio=1.,
                                      capacity=self.configs.capacity)
         if split == 'test':
             return test_loader
