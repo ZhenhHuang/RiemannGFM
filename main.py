@@ -82,15 +82,14 @@ parser.add_argument('--lp_epochs', type=int, default=200)
 parser.add_argument('--lr_lp', type=float, default=0.001)
 parser.add_argument('--weight_decay_lp', type=float, default=0.0)
 
-# Graph classification
-parser.add_argument('--gc_epochs', type=int, default=200)
-parser.add_argument('--lr_gc', type=float, default=0.001)
-parser.add_argument('--weight_decay_gc', type=float, default=0.0)
-
 """GPUs"""
 parser.add_argument('--use_gpu', action='store_false', help='use gpu')
 parser.add_argument('--gpu', type=int, default=0, help='gpu')
 parser.add_argument('--devices', type=str, default='0,1', help='device ids of multiple gpus')
+
+"""Others"""
+parser.add_argument('--load', action='store_false', help='load pretrained model for downstream tasks')
+parser.add_argument('--finetune', action='store_false', help='whether fine tune')
 
 configs = parser.parse_args()
 
