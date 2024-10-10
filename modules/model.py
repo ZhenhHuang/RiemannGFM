@@ -50,7 +50,7 @@ class GeoGFM(nn.Module):
         S_E = self.manifold_H.proju(x_S, x_E)
 
         H_E = self.manifold_H.transp0back(x_H, H_E)
-        S_E = self.manifold_S.transp(x_S, self.manifold_S.origin(x_S.shape, device=x_S.device), S_E)
+        S_E = self.manifold_S.transp0back(x_S, S_E)
 
         log0_H = self.manifold_H.logmap0(x_H)
         log0_S = self.manifold_S.logmap0(x_S)
@@ -123,28 +123,8 @@ class StructuralBlock(nn.Module):
         S_E = self.manifold_H.proju(x_S, x_E)
 
         H_E = self.manifold_H.transp0back(x_H, H_E)
-        S_E = self.manifold_S.transp(x_S, self.manifold_S.origin(x_S.shape, device=x_S.device), S_E)
+        S_E = self.manifold_S.transp0back(x_S, S_E)
 
         E = torch.cat([x_E, H_E, S_E], dim=-1)
         x_E = self.proj(E)
         return x_E, x_H, x_S
-
-
-class EpsNet(nn.Module):
-    def __init__(self, in_dim, hidden_dim, dropout):
-        super(EpsNet, self).__init__()
-        self.lin1 = nn.Linear(in_dim, hidden_dim)
-        self.drop = nn.Dropout(dropout)
-        self.lin2 = nn.Linear(2 * hidden_dim, 1)
-
-    def forward(self, x, y):
-        """
-
-        :param x: src nodes
-        :param y: dst nodes
-        :return:
-        """
-        x, y = self.lin1(x), self.lin1(y)
-        z = torch.concat([x, y], dim=-1)
-        z = F.relu(self.lin2(self.drop(z)))
-        return z.squeeze(-1)

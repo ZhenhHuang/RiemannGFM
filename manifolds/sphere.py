@@ -91,3 +91,6 @@ class Sphere(geoopt.Sphere):
                 + mean
         )
         return geoopt.ManifoldTensor(self.expmap0(tens), manifold=self)
+
+    def transp0back(self, x, u):
+        return self.transp(x, self.origin(x.shape, device=x.device), u)
