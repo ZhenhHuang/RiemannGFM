@@ -47,7 +47,7 @@ class GeoGFM(nn.Module):
         x_E, x_H, x_S = x_tuple
 
         H_E = self.manifold_H.proju(x_H, x_E)
-        S_E = self.manifold_H.proju(x_S, x_E)
+        S_E = self.manifold_S.proju(x_S, x_E)
 
         H_E = self.manifold_H.transp0back(x_H, H_E)
         S_E = self.manifold_S.transp0back(x_S, S_E)
@@ -120,7 +120,7 @@ class StructuralBlock(nn.Module):
         x_S = self.Sph_learner(x_H, x_S, data)
 
         H_E = self.manifold_H.proju(x_H, x_E)
-        S_E = self.manifold_H.proju(x_S, x_E)
+        S_E = self.manifold_S.proju(x_S, x_E)
 
         H_E = self.manifold_H.transp0back(x_H, H_E)
         S_E = self.manifold_S.transp0back(x_S, S_E)

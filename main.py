@@ -48,6 +48,9 @@ parser.add_argument('--activation', type=str, default=None)
 parser.add_argument('--embed_dim_lp', type=int, default=64)  # fine tune LP
 parser.add_argument('--task_hidden_dim', type=int, default=128)  # for few shot
 parser.add_argument('--nc_hidden_dim', type=int, default=32)  # for fine tune NC
+parser.add_argument('--drop_edge', type=float, default=0.2)
+parser.add_argument('--drop_feats', type=float, default=0.3)
+
 
 """Training settings"""
 parser.add_argument('--exp_iters', type=int, default=5)
@@ -111,13 +114,13 @@ if configs.task == 'Pretrain':
     pretrain_exp = Pretrain(configs)
     pretrain_exp.pretrain(first_load=False, start_data=None)
 elif configs.task == 'NC':
-    exp = NodeClassification(configs, load=True, finetune=True)
+    exp = NodeClassification(configs, load=self.configs.load, finetune=self.configs.finetune)
     exp.train()
 elif configs.task == 'LP':
-    exp = LinkPrediction(configs, load=True, finetune=True)
+    exp = LinkPrediction(configs, load=self.configs.load, finetune=self.configs.finetune)
     exp.train()
 elif configs.task == 'Few-NC':
-    exp = FewShotNC(configs, load=True)
+    exp = FewShotNC(configs, load=self.configs.load)
     exp.train(load_trained_model=False)
 else:
     raise NotImplementedError

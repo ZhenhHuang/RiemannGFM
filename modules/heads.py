@@ -26,7 +26,7 @@ class GCN(nn.Module):
 
 
 class NodeClsHead(nn.Module):
-    def __init__(self, pretrained_model, in_dim, hidden_dim, num_cls):
+    def __init__(self, pretrained_model, in_dim, hidden_dim, num_cls, drop_edge, drop_feats):
         """
 
         :param in_dim: input dimension of three components
@@ -34,7 +34,7 @@ class NodeClsHead(nn.Module):
         """
         super(NodeClsHead, self).__init__()
         self.pretrained_model = pretrained_model
-        self.head = GCN(2, in_dim, hidden_dim, num_cls, drop_edge=0.5, drop_feats=0.2)
+        self.head = GCN(2, in_dim, hidden_dim, num_cls, drop_edge=drop_edge, drop_feats=drop_feats)
 
     def forward(self, data):
         """
@@ -74,7 +74,7 @@ class LinkPredHead(nn.Module):
 
 
 class ShotNCHead(nn.Module):
-    def __init__(self, pretrained_model, cls_embeddings, in_dim, hidden_dim, cls_dim):
+    def __init__(self, pretrained_model, cls_embeddings, in_dim, hidden_dim, cls_dim, drop_edge, drop_feats):
         """
 
         :param in_dim: input dimension of three components
@@ -82,7 +82,7 @@ class ShotNCHead(nn.Module):
         """
         super(ShotNCHead, self).__init__()
         self.pretrained_model = pretrained_model
-        self.head = GCN(2, in_dim, hidden_dim, cls_dim, drop_edge=0.5, drop_feats=0.2)
+        self.head = GCN(2, in_dim, hidden_dim, cls_dim, drop_edge=drop_edge, drop_feats=drop_feats)
         self.cls_embeddings = cls_embeddings
 
     def forward(self, data):
