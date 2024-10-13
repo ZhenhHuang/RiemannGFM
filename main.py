@@ -51,7 +51,6 @@ parser.add_argument('--nc_hidden_dim', type=int, default=32)  # for fine tune NC
 parser.add_argument('--drop_edge', type=float, default=0.2)
 parser.add_argument('--drop_feats', type=float, default=0.3)
 
-
 """Training settings"""
 parser.add_argument('--exp_iters', type=int, default=5)
 parser.add_argument('--val_every', type=int, default=1)
@@ -114,10 +113,10 @@ if configs.task == 'Pretrain':
     pretrain_exp = Pretrain(configs)
     pretrain_exp.pretrain(first_load=False, start_data=None)
 elif configs.task == 'NC':
-    exp = NodeClassification(configs, load=self.configs.load, finetune=self.configs.finetune)
+    exp = NodeClassification(configs, load=configs.load, finetune=configs.finetune)
     exp.train()
 elif configs.task == 'LP':
-    exp = LinkPrediction(configs, load=self.configs.load, finetune=self.configs.finetune)
+    exp = LinkPrediction(configs, load=configs.load, finetune=configs.finetune)
     exp.train()
 elif configs.task == 'Few-NC':
     exp = FewShotNC(configs, load=self.configs.load)
