@@ -114,13 +114,13 @@ if configs.task == 'Pretrain':
     pretrain_exp = Pretrain(configs)
     pretrain_exp.pretrain(first_load=False, start_data=None)
 elif configs.task == 'NC':
-    exp = NodeClassification(configs, load=True, finetune=True)
+    exp = NodeClassification(configs, load=self.configs.load, finetune=self.configs.finetune)
     exp.train()
 elif configs.task == 'LP':
-    exp = LinkPrediction(configs, load=True, finetune=True)
+    exp = LinkPrediction(configs, load=self.configs.load, finetune=self.configs.finetune)
     exp.train()
 elif configs.task == 'Few-NC':
-    exp = FewShotNC(configs, load=True)
+    exp = FewShotNC(configs, load=self.configs.load)
     exp.train(load_trained_model=False)
 else:
     raise NotImplementedError
