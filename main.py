@@ -14,7 +14,7 @@ np.random.seed(seed)
 parser = argparse.ArgumentParser(description='Geometric Graph Foundation Model')
 
 """Dataset settings"""
-parser.add_argument('--task', type=str, default='Few-NC',
+parser.add_argument('--task', type=str, default='NC',
                     choices=['NC', 'LP', 'GC', 'Pretrain', 'Few-NC'])
 parser.add_argument('--dataset', type=str, default='Citeseer',
                     help="['computers', 'photo', 'KarateClub', 'CS', 'Physics']")
