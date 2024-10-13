@@ -18,6 +18,9 @@ python main.py \
 --dropout 0.1 \
 --embed_dim 32 \
 --hidden_dim 256 \
+--task_hidden_dim 128 \
 --val_every 1 \
 --patience 3 \
---is_load false
+--is_load false \
+ --drop_edge 0.2 \
+ --drop_feats 0.3

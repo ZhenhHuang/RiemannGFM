@@ -20,4 +20,6 @@ python main.py \
 --pretrain_epochs 3 \
 --lr_nc 0.01 \
 --weight_decay_nc 0.0 \
---nc_epochs 120
+--nc_epochs 120 \
+ --drop_edge 0.2 \
+ --drop_feats 0.3

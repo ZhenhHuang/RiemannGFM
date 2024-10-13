@@ -73,7 +73,9 @@ class NodeClassification(SupervisedExp):
     def load_model(self):
         nc_model = NodeClsHead(self.pretrained_model, 2 * self.configs.embed_dim + input_dim_dict[self.configs.dataset],
                                self.configs.nc_hidden_dim,
-                               class_num_dict[self.configs.dataset]).to(self.device)
+                               class_num_dict[self.configs.dataset],
+                               self.configs.drop_edge,
+                               self.configs.drop_feats).to(self.device)
         return nc_model
 
     def load_data(self, split: str):
