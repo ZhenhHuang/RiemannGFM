@@ -4,6 +4,7 @@ import torch.nn.functional as F
 import torch.nn as nn
 from torch_geometric.nn.conv import GCNConv
 from torch_geometric.utils import negative_sampling, dropout_edge
+from torch_scatter import scatter_mean
 
 
 class GCN(nn.Module):
@@ -71,6 +72,34 @@ class LinkPredHead(nn.Module):
         score = F.cosine_similarity(x_src, x_dst, dim=-1)
 
         return score, data.edge_label
+
+
+class GraphClsHead(nn.Module):
+    def __init__(self, pretrained_model, in_dim, hidden_dim, num_cls, drop_edge, drop_feats):
+        """
+
+        :param in_dim: input dimension of three components
+        :param num_cls: number of classes
+        """
+        super(GraphClsHead, self).__init__()
+        self.pretrained_model = pretrained_model
+        self.head = nn.Linear(in_dim, num_cls, bias=False)
+        self.drop = nn.Dropout(drop_feats)
+
+    def forward(self, data):
+        """
+
+        :param data
+        :return:
+        """
+        x_E, x_H, x_S = self.pretrained_model(data)
+        manifold_H = self.pretrained_model.manifold_H
+        manifold_S = self.pretrained_model.manifold_S
+        x_h = manifold_H.logmap0(x_H)
+        x_s = manifold_S.logmap0(x_S)
+        x = torch.concat([data.x, x_h, x_s], dim=-1)
+        x = scatter_mean(x, data.batch, dim=0)
+        return self.head(self.drop(x))
 
 
 class ShotNCHead(nn.Module):

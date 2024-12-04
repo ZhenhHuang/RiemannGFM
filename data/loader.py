@@ -1,10 +1,12 @@
 import torch
 from torch_geometric.data import Data, Batch
-from torch_geometric.loader import NeighborLoader, LinkNeighborLoader
+from torch_geometric.loader import NeighborLoader, LinkNeighborLoader, DataLoader
 from typing import Union, List, Optional, Callable
 from torch_geometric.utils import add_self_loops, to_networkx, from_networkx
 from collections import OrderedDict
 import networkx as nx
+from torch_scatter import scatter_sum
+import numpy as np
 
 
 class ExtractNodeLoader(NeighborLoader):
@@ -108,6 +110,58 @@ class ExtractLinkLoader(LinkNeighborLoader):
 
     def clear_cache(self):
         self.cache.clear()
+
+
+class ExtractGraphLoader(DataLoader):
+    def __init__(self,
+                 dataset,
+                 batch_size: int = 1,
+                 shuffle: bool = False,
+                 follow_batch=None,
+                 exclude_keys=None,
+                 capacity: int = 1000,
+                 centroid_num: int = 10,
+                 **kwargs,
+                 ):
+        super(ExtractGraphLoader, self).__init__(
+            dataset,
+            batch_size,
+            shuffle,
+            follow_batch,
+            exclude_keys,
+            ** kwargs,
+        )
+        self.cache = LRUCache(capacity=capacity)
+        self.cn = centroid_num
+
+    def __iter__(self):
+        for key, data in enumerate(super().__iter__()):
+            data.edge_index = add_self_loops(data.edge_index, num_nodes=data.num_nodes)[0]
+            if key in self.cache:
+                data = self.cache.get(key)
+            else:
+                tree_list = []
+                ptr = torch.ones(data.num_nodes)
+                num_per_G = scatter_sum(ptr, data.batch).long().numpy()
+                n_id = np.arange(data.num_nodes)
+                subset = []
+                cur = 0
+                for i in num_per_G:
+                    subset.append(np.random.choice(n_id[cur: cur + i], self.cn, replace=False))
+                    cur += i
+                subset = np.concatenate(subset, axis=0)
+                G = to_networkx(Data(edge_index=data.edge_index, num_nodes=data.num_nodes))
+                for m, seed_node in enumerate(subset):
+                    sorted_edges = sorted(list(nx.bfs_tree(G, seed_node).edges()))
+                    tG = nx.Graph()
+                    tG.add_edges_from(sorted_edges)
+                    tree_edge_index = from_networkx(tG).edge_index
+                    del tG
+                    tree_list.append(Data(edge_index=tree_edge_index, num_nodes=subset.shape[0], seed_node=seed_node))
+                batch_tree = Batch.from_data_list(tree_list)
+                data.batch_tree = batch_tree
+                self.cache.put(key, data)
+            yield data
 
 
 class LRUCache:

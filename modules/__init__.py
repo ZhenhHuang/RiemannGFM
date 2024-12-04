@@ -1,9 +1,9 @@
 from .layers import ManifoldEncoder, EuclideanEncoder
 from .basics import HyperbolicStructureLearner, SphericalStructureLearner
 from .model import GeoGFM, InitBlock
-from .heads import NodeClsHead, LinkPredHead, ShotNCHead
+from .heads import NodeClsHead, LinkPredHead, ShotNCHead, GraphClsHead
 
 __all__ = ["ManifoldEncoder", "EuclideanEncoder", "InitBlock",
            "HyperbolicStructureLearner", "SphericalStructureLearner",
            "GeoGFM", "NodeClsHead", "LinkPredHead",
-           "ShotNCHead"]
+           "ShotNCHead", "GraphClsHead"]
