@@ -6,7 +6,7 @@ import numpy as np
 from modules import *
 from utils.train_utils import EarlyStopping, act_fn
 from utils.logger import create_logger
-from data import load_data, input_dim_dict, ExtractNodeLoader, get_eigen_tokens
+from data import *
 import os
 from tqdm import tqdm
 

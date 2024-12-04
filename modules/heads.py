@@ -83,6 +83,7 @@ class GraphClsHead(nn.Module):
         """
         super(GraphClsHead, self).__init__()
         self.pretrained_model = pretrained_model
+        # self.proj = GCNConv(in_dim, hidden_dim)
         self.head = nn.Linear(in_dim, num_cls, bias=False)
         self.drop = nn.Dropout(drop_feats)
 
@@ -97,7 +98,8 @@ class GraphClsHead(nn.Module):
         manifold_S = self.pretrained_model.manifold_S
         x_h = manifold_H.logmap0(x_H)
         x_s = manifold_S.logmap0(x_S)
-        x = torch.concat([data.x, x_h, x_s], dim=-1)
+        x = torch.concat([x_E, x_h, x_s], dim=-1)
+        # x = self.proj(x, data.edge_index)
         x = scatter_mean(x, data.batch, dim=0)
         return self.head(self.drop(x))
 

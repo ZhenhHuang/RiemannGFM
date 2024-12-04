@@ -347,7 +347,7 @@ class GraphClassification(SupervisedExp):
         self.gc_model = self.load_model()
 
     def load_model(self):
-        gc_model = GraphClsHead(self.pretrained_model, 2 * self.configs.embed_dim + input_dim_dict[self.configs.dataset],
+        gc_model = GraphClsHead(self.pretrained_model, 3 * self.configs.embed_dim,
                                self.configs.nc_hidden_dim,
                                class_num_dict[self.configs.dataset],
                                self.configs.drop_edge,
