@@ -130,7 +130,7 @@ elif configs.task == 'GC':
     exp = GraphClassification(configs, load=configs.load, finetune=configs.finetune)
     exp.train()
 elif configs.task == 'Few-NC':
-    exp = FewShotNC(configs, load=self.configs.load)
+    exp = FewShotNC(configs, load=configs.load)
     exp.train(load_trained_model=False)
 elif configs.task == 'Clu':
     exp = NodeCluster(configs, load=configs.load)
