@@ -14,13 +14,13 @@ np.random.seed(seed)
 parser = argparse.ArgumentParser(description='Geometric Graph Foundation Model')
 
 """Dataset settings"""
-parser.add_argument('--task', type=str, default='NC',
-                    choices=['NC', 'LP', 'GC', 'Pretrain', 'Few-NC', "Clu"])
+parser.add_argument('--task', type=str, default='Few-NC',
+                    choices=['NC', 'LP', 'Pretrain', 'Few-NC'])
 parser.add_argument('--dataset', type=str, default='Citeseer',
                     help="['computers', 'photo', 'KarateClub', 'CS', 'Physics']")
 parser.add_argument('--pretrain_dataset', nargs="+", type=str,
                     default=['ogbn-arxiv', 'computers', 'Physics'])
-parser.add_argument('--query_set', type=str, default='USA')
+parser.add_argument('--query_set', type=str, default='WikiCS')
 parser.add_argument('--root_path', type=str, default='datasets')
 parser.add_argument('--num_neighbors', type=int, nargs="+", default=[20, 10],
                     help="Number of neighbors of data_loaders")
@@ -82,16 +82,6 @@ parser.add_argument('--lp_epochs', type=int, default=200)
 parser.add_argument('--lr_lp', type=float, default=0.001)
 parser.add_argument('--weight_decay_lp', type=float, default=0.0)
 
-"""Graph classification"""
-parser.add_argument('--gc_epochs', type=int, default=120)
-parser.add_argument('--lr_gc', type=float, default=0.01)
-parser.add_argument('--weight_decay_gc', type=float, default=0.0000)
-
-"""Node clustering"""
-parser.add_argument('--clu_epochs', type=int, default=120)
-parser.add_argument('--lr_clu', type=float, default=0.001)
-parser.add_argument('--weight_decay_clu', type=float, default=0.0000)
-
 """GPUs"""
 parser.add_argument('--use_gpu', action='store_false', help='use gpu')
 parser.add_argument('--gpu', type=int, default=0, help='gpu')
@@ -126,15 +116,9 @@ elif configs.task == 'NC':
 elif configs.task == 'LP':
     exp = LinkPrediction(configs, load=configs.load, finetune=configs.finetune)
     exp.train()
-elif configs.task == 'GC':
-    exp = GraphClassification(configs, load=configs.load, finetune=configs.finetune)
-    exp.train()
 elif configs.task == 'Few-NC':
     exp = FewShotNC(configs, load=configs.load)
     exp.train(load_trained_model=False)
-elif configs.task == 'Clu':
-    exp = NodeCluster(configs, load=configs.load)
-    exp.run(configs.finetune)
 else:
     raise NotImplementedError
 

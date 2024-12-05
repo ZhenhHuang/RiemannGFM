@@ -74,36 +74,6 @@ class LinkPredHead(nn.Module):
         return score, data.edge_label
 
 
-class GraphClsHead(nn.Module):
-    def __init__(self, pretrained_model, in_dim, hidden_dim, num_cls, drop_edge, drop_feats):
-        """
-
-        :param in_dim: input dimension of three components
-        :param num_cls: number of classes
-        """
-        super(GraphClsHead, self).__init__()
-        self.pretrained_model = pretrained_model
-        # self.proj = GCNConv(in_dim, hidden_dim)
-        self.head = nn.Linear(in_dim, num_cls, bias=False)
-        self.drop = nn.Dropout(drop_feats)
-
-    def forward(self, data):
-        """
-
-        :param data
-        :return:
-        """
-        x_E, x_H, x_S = self.pretrained_model(data)
-        manifold_H = self.pretrained_model.manifold_H
-        manifold_S = self.pretrained_model.manifold_S
-        x_h = manifold_H.logmap0(x_H)
-        x_s = manifold_S.logmap0(x_S)
-        x = torch.concat([x_E, x_h, x_s], dim=-1)
-        # x = self.proj(x, data.edge_index)
-        x = scatter_mean(x, data.batch, dim=0)
-        return self.head(self.drop(x))
-
-
 class ShotNCHead(nn.Module):
     def __init__(self, pretrained_model, cls_embeddings, in_dim, hidden_dim, cls_dim, drop_edge, drop_feats):
         """

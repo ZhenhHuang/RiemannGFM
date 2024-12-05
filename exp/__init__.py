@@ -1,6 +1,5 @@
-from .supervised import NodeClassification, LinkPrediction, GraphClassification
+from .supervised import NodeClassification, LinkPrediction
 from .pretrain import Pretrain
 from .transfer import FewShotNC
-from .unsupervised import NodeCluster
 
-__all__ = ['NodeClassification', 'LinkPrediction', "GraphClassification", 'Pretrain', 'FewShotNC', 'NodeCluster']
+__all__ = ['NodeClassification', 'LinkPrediction', 'Pretrain', 'FewShotNC', 'NodeCluster']
