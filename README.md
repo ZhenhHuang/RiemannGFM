@@ -1,6 +1,6 @@
 # RiemannGFM
 
-## Get Start
+## Get Started
 First, install all the required pakages using
 ```shell
 pip install -r requirements.txt
@@ -37,3 +37,11 @@ you can add ```--load``` to bash script.
 If you do not want to fine-tune pretrained model weights during 
 training on downstream tasks,
 you can add ```--finetune``` to bash script.
+
+## Model Architecture
+![model architecture](model.png)
+
+## Experimental Results
+![alt text](results_1.png)
+
+![alt text](results_2.png)
