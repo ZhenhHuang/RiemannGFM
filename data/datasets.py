@@ -21,16 +21,16 @@ class_num_dict = {"KarateClub": 4, "Cora": 7, "Citeseer": 6, "PubMed": 3, "ogbn-
 def load_data(root: str, data_name: str,
               num_val=0.1, num_test=0.2, num_per_class=None) -> Dataset:
     if num_per_class is None:
-        transform = RandomNodeSplit(num_val=0.1, num_test=0.2)
+        transform = RandomNodeSplit(num_val=num_val, num_test=num_test)
     else:
-        transform = RandomNodeSplit(num_val=0.1, num_test=0.2, split="test_rest", num_train_per_class=num_per_class)
+        transform = RandomNodeSplit(num_val=num_val, num_test=num_test, split="test_rest", num_train_per_class=num_per_class)
 
     if data_name in ["computers", "photo"]:
-        dataset = Amazon(root, name=data_name, transform=RandomNodeSplit(num_val=num_val, num_test=num_test))
+        dataset = Amazon(root, name=data_name, transform=transform)
     elif data_name == "KarateClub":
-        dataset = KarateClub(transform=RandomNodeSplit(num_val=0.2, num_test=0.3))
+        dataset = KarateClub(transform=transform)
     elif data_name in ["CS", "Physics"]:
-        dataset = Coauthor(root, name=data_name, transform=RandomNodeSplit(num_val=0.2, num_test=0.3))
+        dataset = Coauthor(root, name=data_name, transform=transform)
     elif data_name in ['Cora', 'Citeseer', 'PubMed']:
         if num_per_class is None:
             num_per_class = 20
@@ -50,7 +50,7 @@ def load_data(root: str, data_name: str,
     elif data_name == 'Reddit':
         dataset = Reddit(root)
     elif data_name == 'PolBlogs':
-        dataset = PolBlogs(root, transform=RandomNodeSplit(num_val=0.1, num_test=0.2))
+        dataset = PolBlogs(root, transform=transform)
     elif data_name == "WikiCS":
         dataset = WikiCS(os.path.join(root, data_name), transform=transform)
     elif data_name in ["COLLAB"]:
